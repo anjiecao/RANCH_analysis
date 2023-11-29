@@ -1,3 +1,8 @@
+
+# Big files 
+sim_res/00_param_search_raw/*.csv
+
+
 # History files
 .Rhistory
 .Rapp.history
