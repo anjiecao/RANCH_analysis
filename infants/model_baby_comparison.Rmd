@@ -1,0 +1,517 @@
+
+# libraries
+```{r}
+
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(Metrics)
+library(broom.mixed)
+library(confintr)
+library(colf)
+library(optimx)
+```
+
+```{r}
+# Load model data
+model_data = read.csv('processed_data/model_data/grouped_model_means.csv')
+
+model_data_no_noise = read.csv('processed_data/model_data/grouped_model_means_no_noise.csv') %>% select(n_samples,stim_sequence,test_type, fam_duration)
+
+model_data_no_learning = read.csv('processed_data/model_data/grouped_model_means_no_learning.csv') %>% select(n_samples,stim_sequence,test_type,fam_duration)
+
+# Load infant data (only test trials)
+infant_data = read.csv('processed_data/model_data/infant_processed_data.csv') %>% filter(fam_or_test == 'test', !exclude)
+
+
+```
+
+# Preprocessing
+```{r}
+
+# Put infant data in grouped means format
+grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
+
+# duplicate the "B" ones to have both 5 and 10
+rows_to_duplicate <- model_data %>% filter(stim_sequence == "B")
+
+rows_to_duplicate <- rows_to_duplicate %>%
+  mutate(forced_exposure_max = ifelse(forced_exposure_max == 10, 5, 10))
+
+model_data <- rbind(model_data, rows_to_duplicate)
+
+# put parameter ID to model data
+model_data = model_data %>% mutate(param_info = paste("mu", mu_prior, "v", v_prior, "a", alpha_prior, "b", beta_prior, "ep", epsilon, "expos", forced_exposure_max, sep = "_"))
+
+
+
+
+# only keep parameters for which all fam durations have been computed
+model_data <- model_data %>%
+  group_by(param_info, test_type) %>%
+  filter(all(1:9 %in% fam_duration)) %>%
+  ungroup() %>%
+  group_by(param_info) %>%
+  filter(all(c("nov", "fam") %in% test_type)) %>%
+  ungroup()
+
+```
+
+
+
+```{r}
+
+# combine model with data
+combined_df = model_data %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(grouped_infant_means, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+# new way of scaling
+
+# group by parameter info and find groupwise intercept and slope
+grouped_stats <- combined_df %>%
+  group_by(param_info) %>%
+  do(tidy(lm(LT ~ n_samples, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  ungroup() %>%
+  spread(term, estimate)
+
+# merge with intercept and slope and scale the samples
+combined_df <- combined_df %>%
+  left_join(grouped_stats, by = c("param_info")) %>% 
+  rename(intercept = "(Intercept)", slope = n_samples.y, n_samples = n_samples.x) %>% 
+  mutate(scaled_samples = n_samples * slope + intercept) %>% select(-n_samples)
+
+
+# scale baseline models the same way
+combined_df_no_noise = model_data_no_noise %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(grouped_infant_means, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+grouped_stats <- combined_df_no_noise %>%
+  do(tidy(lm(LT ~ n_samples, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  ungroup() %>%
+  spread(term, estimate)
+
+model_data_no_noise <- model_data_no_noise %>%
+  mutate(scaled_samples = n_samples * grouped_stats$n_samples + grouped_stats$`(Intercept)`) 
+
+combined_df_no_learning = model_data_no_learning %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(grouped_infant_means, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+# restrict this coefficient to 0, otherwise it becomes negative
+res <- colf_nlxb(LT ~ n_samples, data = combined_df_no_learning, lower = c(-Inf, -Inf))
+
+grouped_stats <- res$coefficients
+
+model_data_no_learning <- model_data_no_learning %>%
+  mutate(scaled_samples = n_samples * grouped_stats[2] + grouped_stats[1])
+
+# compute per param_setting correlation and sort by max corr, and select
+top_corr_param = combined_df %>% group_by(param_info) %>% dplyr::summarize(corr = cor(scaled_samples, LT), rmse = rmse(LT, scaled_samples)) %>% arrange(desc(corr)) %>% pull(param_info) %>% first() 
+
+# grab top parameter setting and merge with baseline models
+top_sim_result = combined_df %>% filter(param_info == top_corr_param) %>% left_join(model_data_no_learning , by = c("stim_sequence"), suffix = c('_GRANCH', '_nolearning')) %>% left_join(model_data_no_noise , by = c("stim_sequence")) %>% rename(scaled_samples_nonoise = scaled_samples) 
+
+
+plot_df = top_sim_result %>% rename(`Infant behavior` = LT, `RANCH (infants)` = scaled_samples_GRANCH, `No Learning` = scaled_samples_nolearning, `No Noise` = scaled_samples_nonoise) %>%
+  pivot_longer(cols = c("RANCH (infants)", "No Learning", "No Noise", "Infant behavior"), 
+               names_to = "value_type", values_to = "value") %>% mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)", "No Learning", "No Noise")),
+                                                                        test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
+  
+
+```
+# Plot the results
+```{r, fig.width=6, fig.height=3}
+
+# histogram of correlations across param values
+# plot 
+ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + scale_y_continuous(breaks = c(3, 10, 30)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + coord_cartesian(ylim = c(0,30)) + coord_trans(y = "log10") + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+
+
+write_csv(plot_df, "processed_data/model_data/plot_df.csv")
+
+# plot GRANCH vs infants directly (all in black)
+
+# reshape df 
+
+ggplot(plot_df %>% filter(value_type == 'GRANCH' | value_type == 'Infants'), aes(x = fam_duration, y = value, color = test_type)) +  geom_smooth(aes(linetype = value_type, color = test_type), method ="lm", alpha = 0.4, se = F) + geom_point(aes(shape = value_type, color = test_type), size = 2)  + ylab('Looking time') + xlab('fam duration') + theme_classic(20) + scale_color_manual(values = c("blue", "red")) + coord_trans(y = "log10") + coord_cartesian(ylim=c(0,25)) +  scale_x_continuous(breaks = c(1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + scale_shape_manual(values = c("Infants" = 15, "GRANCH" = 1))  
+
+
+
+ggplot(model_data, aes(x = fam_duration, y = n_samples, group = test_type, color + test_type)) + geom_point(aes(color = test_type)) + geom_line(aes(color = test_type)) + facet_wrap(vars(param_info), nrow = 2) + theme_classic(base_size = 10) + theme(strip.text.x = element_text(size = 4)) + scale_color_manual(values = c("blue", "red"))
+
+
+```
+
+
+# Cross validation by infants
+```{r}
+# leave one out in a for loop
+
+# Load infant data (only test trials)
+infant_data = read.csv('processed_data/model_data/infant_processed_data.csv') %>% filter(fam_or_test == 'test', !exclude)
+
+# grab relevant model results:
+top_model_data = model_data %>% filter(param_info == "mu_0_v_2_a_5_b_15_ep_1e-05_expos_5") %>% select(fam_duration, test_type, n_samples)
+
+# remove the duplicate on 0 fam
+top_model_data = top_model_data %>% distinct(fam_duration, test_type, .keep_all = TRUE)
+
+# create unique subject id's
+infant_data = infant_data %>% unite("unique_id", experiment, subject_num) 
+
+# number of folds for crossvalidation
+subj_ids = infant_data %>% pull(unique_id) %>% unique() 
+
+n_folds = length(subj_ids) 
+
+# for subjectwise predictions
+rsquared_GRANCH = vector(mode = "list", length = n_folds)
+rsquared_nonoise = vector(mode = "list", length = n_folds)
+rsquared_nolearning = vector(mode = "list", length = n_folds)
+
+rmse_GRANCH = vector(mode = "list", length = n_folds)
+rmse_nonoise = vector(mode = "list", length = n_folds)
+rmse_nolearning = vector(mode = "list", length = n_folds)
+
+# for tally of overall prediction vs. LT
+LT_tally = c()
+GRANCH_tally = c()
+Nonoise_tally = c()
+Nolearning_tally = c()
+
+combined_df = infant_data %>% left_join(top_model_data, by = c("fam_duration", "test_type")) %>% left_join(model_data_no_learning, by = c("fam_duration", "test_type"), suffix = c("_GRANCH", "_nolearning")) %>% left_join(model_data_no_noise, by = c("fam_duration", "test_type")) %>% rename(n_samples_nonoise = n_samples) %>% filter(fam_duration != 0)
+
+for (k in 1:n_folds) {
+  train_subj = subj_ids[-k]
+  train_data = combined_df[infant_data$unique_id %in% train_subj,]
+  
+  test_subj = subj_ids[k]
+  test_data = combined_df %>% filter(unique_id == test_subj)
+  
+  # fit training set
+  fitted_stats_GRANCH = colf_nlxb(LT ~ n_samples_GRANCH + block_num, data = train_data, lower = c(-Inf, 0, -Inf), higher = c(-Inf, -Inf, 0))
+  
+  fitted_stats_nonoise = colf_nlxb(LT ~ n_samples_nonoise + block_num, data = train_data, lower = c(-Inf, 0, -Inf), higher = c(-Inf, -Inf, 0))
+  
+  fitted_stats_nolearning = colf_nlxb(LT ~ n_samples_nolearning + block_num, data = train_data, lower = c(-Inf, 0, -Inf), higher = c(-Inf, -Inf, 0))
+
+  sample_slope_GRANCH = fitted_stats_GRANCH$coefficients['param_n_samples_GRANCH']
+  block_num_slope_GRANCH = fitted_stats_GRANCH$coefficients['param_block_num']
+  intercept_GRANCH = fitted_stats_GRANCH$coefficients['param_X.Intercept.']
+  
+  sample_slope_nonoise = fitted_stats_nonoise$coefficients['param_n_samples_nonoise']
+  block_num_slope_nonoise = fitted_stats_nonoise$coefficients['param_block_num']
+  intercept_nonoise = fitted_stats_nonoise$coefficients['param_X.Intercept.']
+  
+  sample_slope_nolearning = fitted_stats_nolearning$coefficients['param_n_samples_nolearning']
+  block_num_slope_nolearning = fitted_stats_nolearning$coefficients['param_block_num']
+  intercept_nolearning = fitted_stats_nolearning$coefficients['param_X.Intercept.']
+  
+  # restrict block num and sample slope to be negative / positive respectively
+
+  test_set = test_data %>%
+    mutate(scaled_samples_GRANCH = n_samples_GRANCH * sample_slope_GRANCH + block_num * block_num_slope_GRANCH + intercept_GRANCH,
+           scaled_samples_nonoise = n_samples_nonoise * sample_slope_nonoise + block_num * block_num_slope_nonoise + intercept_nonoise,
+           scaled_samples_nolearning = n_samples_nolearning * sample_slope_nolearning + block_num * block_num_slope_nolearning + intercept_nolearning)
+  
+  # do separate crossvalidation only 6, 8, 9
+  
+  # save per subject
+  rsquared_GRANCH[[k]] = cor(test_set$LT, test_set$scaled_samples_GRANCH)^2
+  rsquared_nonoise[[k]] = cor(test_set$LT, test_set$scaled_samples_nonoise)^2
+  rsquared_nolearning[[k]] = cor(test_set$LT, test_set$scaled_samples_nolearning)^2
+  
+  rmse_GRANCH[[k]] = rmse(test_set$LT, test_set$scaled_samples_GRANCH)
+  rmse_nonoise[[k]] = rmse(test_set$LT, test_set$scaled_samples_nonoise)
+  rmse_nolearning[[k]] = rmse(test_set$LT, test_set$scaled_samples_nolearning)
+  
+    # keep tally of predictions vs. LT
+  LT_tally = append(LT_tally, test_set$LT)
+  GRANCH_tally = append(GRANCH_tally, test_set$scaled_samples_GRANCH)
+  Nonoise_tally = append(Nonoise_tally, test_set$scaled_samples_nonoise)
+  Nolearning_tally = append(Nolearning_tally, test_set$scaled_samples_nolearning)
+  
+}
+
+unlist(rsquared_GRANCH) %>% mean(na.rm = TRUE) %>% print()
+unlist(rsquared_nonoise) %>% mean(na.rm = TRUE) %>% print()
+unlist(rsquared_nolearning) %>% mean(na.rm = TRUE) %>% print()
+
+print('RMSE - GRANCH')
+rmse(LT_tally, GRANCH_tally)
+
+print('RMSE - No noise')
+rmse(LT_tally, Nonoise_tally)
+
+print('RMSE - No learning')
+rmse(LT_tally, Nolearning_tally)
+
+print('correlation - GRANCH')
+cor(LT_tally, GRANCH_tally)
+
+print('correlation - No noise')
+cor(LT_tally, Nonoise_tally)
+
+print('correlation - No learning')
+cor(LT_tally, Nolearning_tally)
+
+# compute RMSE stats
+
+mean_rmse_granch = unlist(rmse_GRANCH) %>% mean(na.rm = TRUE) 
+sd_rmse_granch = unlist(rmse_GRANCH) %>% sd(na.rm = TRUE) 
+
+mean_rmse_nonoise = unlist(rmse_nonoise) %>% mean(na.rm = TRUE) 
+sd_rmse_nonoise = unlist(rmse_nonoise) %>% sd(na.rm = TRUE) 
+
+mean_rmse_nolearning = unlist(rmse_nolearning) %>% mean(na.rm = TRUE) 
+sd_rmse_nolearning = unlist(rmse_nolearning) %>% sd(na.rm = TRUE) 
+
+confidence_level <- 0.95
+df <- n_folds - 1
+
+t_value <- qt((1 + confidence_level) / 2, df)
+
+margin_of_error_GRANCH <- t_value * (sd_rmse_granch / sqrt(n_folds))
+margin_of_error_nonoise <- t_value * (sd_rmse_nonoise / sqrt(n_folds))
+margin_of_error_nolearning <- t_value * (sd_rmse_nolearning / sqrt(n_folds))
+
+
+cat("Confidence Interval GRANCH: [", mean_rmse_granch - margin_of_error_GRANCH, ", ", mean_rmse_granch + margin_of_error_GRANCH, "]\n")
+
+cat("Confidence Interval no noise: [", mean_rmse_nonoise - margin_of_error_nonoise, ", ", mean_rmse_nonoise + margin_of_error_nonoise, "]\n")
+
+cat("Confidence Interval no learning: [", mean_rmse_nolearning - margin_of_error_nolearning, ", ", mean_rmse_nonoise + margin_of_error_nolearning, "]\n")
+
+
+```
+
+# Cross validation by condition
+```{r}
+
+# Load infant data (only test trials, and no 0 fam trials)
+infant_data = read.csv('processed_data/model_data/infant_processed_data.csv') %>% filter(fam_or_test == 'test', !exclude) %>%
+   filter(fam_duration != 0)
+
+
+# grab relevant model results:
+top_model_data = model_data %>% filter(param_info == "mu_0_v_2_a_5_b_15_ep_1e-05_expos_5") %>% select(fam_duration, test_type, n_samples)
+
+top_model_data = top_model_data %>% distinct(fam_duration, test_type, .keep_all = TRUE)
+
+# number of folds for crossvalidation
+cond_ids = infant_data %>% pull(fam_duration) %>% unique() 
+
+n_folds = length(cond_ids) 
+
+rsquared_GRANCH = vector(mode = "list", length = n_folds)
+rsquared_nonoise = vector(mode = "list", length = n_folds)
+rsquared_nolearning = vector(mode = "list", length = n_folds)
+
+rmse_GRANCH = vector(mode = "list", length = n_folds)
+rmse_nonoise = vector(mode = "list", length = n_folds)
+rmse_nolearning = vector(mode = "list", length = n_folds)
+
+# for tally of overall prediction vs. LT
+LT_tally = c()
+GRANCH_tally = c()
+Nonoise_tally = c()
+Nolearning_tally = c()
+
+combined_df = infant_data %>% left_join(top_model_data, by = c("fam_duration", "test_type")) %>% distinct() %>% left_join(model_data_no_learning, by = c("fam_duration", "test_type"), suffix = c("_GRANCH", "_nolearning")) %>% left_join(model_data_no_noise, by = c("fam_duration", "test_type")) %>% rename(n_samples_nonoise = n_samples) 
+
+for (k in 1:n_folds) {
+  
+  train_data = combined_df %>% filter(fam_duration != cond_ids[k])
+  test_data = combined_df %>% filter(fam_duration == cond_ids[k])
+  
+  fitted_stats_GRANCH = train_data %>% do(broom.mixed::tidy(lmer(LT ~ n_samples_GRANCH + block_num + (1|unique_id), data = .), effects =  c("fixed", "ran_vals"))) %>% select(-c(std.error, statistic, p.value))
+  
+  fitted_stats_nonoise = train_data %>% do(broom.mixed::tidy(lmer(LT ~ n_samples_nonoise + block_num + (1|unique_id), data = .), effects =  c("fixed", "ran_vals"))) %>% select(-c(std.error, statistic, p.value))
+  
+  fitted_stats_nolearning = train_data %>% do(broom.mixed::tidy(lmer(LT ~ n_samples_nolearning + block_num + (1|unique_id), data = .), effects =  c("fixed", "ran_vals"))) %>% select(-c(std.error, statistic, p.value))
+
+  sample_slope_GRANCH = fitted_stats_GRANCH %>% filter(term == 'n_samples_GRANCH') %>% pull(estimate)
+  block_num_slope_GRANCH = fitted_stats_GRANCH %>% filter(term == 'block_num') %>% pull(estimate)
+  intercept_GRANCH = fitted_stats_GRANCH %>% filter(term == '(Intercept)') %>% pull(estimate)
+
+  sample_slope_nonoise = fitted_stats_nonoise %>% filter(term == 'n_samples_nonoise') %>% pull(estimate)
+  block_num_slope_nonoise = fitted_stats_nonoise %>% filter(term == 'block_num') %>% pull(estimate)
+  intercept_nonoise = fitted_stats_nonoise %>% filter(term == '(Intercept)') %>% pull(estimate)
+  
+  sample_slope_nolearning = fitted_stats_nolearning %>% filter(term == 'n_samples_nolearning') %>% pull(estimate)
+  block_num_slope_nolearning = fitted_stats_nolearning %>% filter(term == 'block_num') %>% pull(estimate)
+  intercept_nolearning = fitted_stats_nolearning %>% filter(term == '(Intercept)') %>% pull(estimate)
+  
+  test_set = test_data %>%
+    mutate(scaled_samples_GRANCH = n_samples_GRANCH * sample_slope_GRANCH + block_num * block_num_slope_GRANCH + intercept_GRANCH,
+           scaled_samples_nonoise = n_samples_nonoise * sample_slope_nonoise + block_num * block_num_slope_nonoise + intercept_nonoise,
+           scaled_samples_nolearning = n_samples_nolearning * sample_slope_nolearning + block_num * block_num_slope_nolearning + intercept_nolearning)
+  
+    # grab compute subject specific intercepts
+  subj_specific_intercepts_GRANCH = fitted_stats_GRANCH %>% filter(effect == "ran_vals")
+  subj_specific_intercepts_nonoise = fitted_stats_nonoise %>% filter(effect == "ran_vals")
+  subj_specific_intercepts_nolearning = fitted_stats_nolearning %>% filter(effect == "ran_vals")
+
+  
+  
+  rsquared_GRANCH[[k]] = cor(test_set$LT, test_set$scaled_samples_GRANCH)^2
+  rsquared_nonoise[[k]] = cor(test_set$LT, test_set$scaled_samples_nonoise)^2
+  rsquared_nolearning[[k]] = cor(test_set$LT, test_set$scaled_samples_nolearning)^2
+  
+  rmse_GRANCH[[k]] = rmse(test_set$LT, test_set$scaled_samples_GRANCH)
+  rmse_nonoise[[k]] = rmse(test_set$LT, test_set$scaled_samples_nonoise)
+  rmse_nolearning[[k]] = rmse(test_set$LT, test_set$scaled_samples_nolearning)
+  
+  # keep tally of predictions vs. LT
+  LT_tally = append(LT_tally, test_set$LT)
+  GRANCH_tally = append(GRANCH_tally, test_set$scaled_samples_GRANCH)
+  Nonoise_tally = append(Nonoise_tally, test_set$scaled_samples_nonoise)
+  Nolearning_tally = append(Nolearning_tally, test_set$scaled_samples_nolearning)
+  
+
+}
+
+unlist(rsquared_GRANCH) %>% mean(na.rm = TRUE) %>% print()
+unlist(rsquared_nonoise) %>% mean(na.rm = TRUE) %>% print()
+unlist(rsquared_nolearning) %>% mean(na.rm = TRUE) %>% print()
+
+
+print('RMSE - GRANCH')
+rmse(LT_tally, GRANCH_tally)
+
+print('RMSE - No noise')
+rmse(LT_tally, Nonoise_tally)
+
+print('RMSE - No learning')
+rmse(LT_tally, Nolearning_tally)
+
+print('correlation - GRANCH')
+cor(LT_tally, GRANCH_tally)
+
+print('correlation - No noise')
+cor(LT_tally, Nonoise_tally)
+
+print('correlation - No learning')
+cor(LT_tally, Nolearning_tally)
+
+
+```
+
+# Try to fit using split half dataset
+```{r}
+
+# training data
+# Get the list of unique subjects
+subjects <- unique(infant_data$unique_id)
+
+# Randomly sample half of the subjects
+trainSubjects <- sample(subjects, size = length(subjects) / 2)
+
+# Create training and test sets
+trainSet <- infant_data[infant_data$unique_id %in% trainSubjects, ]
+testSet <- infant_data[!infant_data$unique_id %in% trainSubjects, ]
+
+trainSetMeans = trainSet %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
+testSetMeans = testSet %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
+
+combined_train_df = model_data %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(trainSetMeans, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+grouped_stats <- combined_train_df %>%
+  group_by(param_info) %>%
+  do(tidy(lm(LT ~ n_samples, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  ungroup() %>%
+  spread(term, estimate)
+
+# merge with intercept and slope and scale the samples
+combined_train_df <- combined_train_df %>%
+  left_join(grouped_stats, by = c("param_info")) %>% 
+  rename(intercept = "(Intercept)", slope = n_samples.y, n_samples = n_samples.x) %>% 
+  mutate(scaled_samples = n_samples * slope + intercept) 
+
+
+# compute per param_setting correlation and sort by max corr, and select
+top_corr_param = combined_train_df %>% group_by(param_info) %>% dplyr::summarize(corr = cor(scaled_samples, LT), rmse = rmse(LT, n_samples)) %>% arrange(desc(corr)) %>% pull(param_info) %>% first() 
+
+combined_test_df = model_data %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(testSetMeans, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT), param_info == top_corr_param)
+
+grouped_stats <- combined_test_df %>%
+  do(tidy(lm(LT ~ n_samples, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  spread(term, estimate)
+
+combined_test_df <- combined_test_df %>% 
+  mutate(scaled_samples = n_samples * grouped_stats$n_samples + grouped_stats$`(Intercept)`) 
+
+cor(combined_test_df$n_samples, combined_test_df$LT)
+
+```
+
+
+# R^2 and RMSE on whole dataset
+```{r}
+
+ rmse_interval <- function(rmse, deg_free, p_lower = 0.025, p_upper = 0.975){
+    tibble(.pred_lower = sqrt(deg_free / qchisq(p_upper, df = deg_free)) * rmse,
+           .pred_upper = sqrt(deg_free / qchisq(p_lower, df = deg_free)) * rmse)
+  }
+
+num_points = length(plot_df %>% filter(value_type == "GRANCH") %>% pull(value))
+
+GRANCH_cor = cor.test(plot_df %>% filter(value_type == "GRANCH") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value))
+
+GRANCH_rmse = rmse(plot_df %>% filter(value_type == "GRANCH") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value)) * 1000
+
+GRANCH_rmse_interval = rmse_interval(GRANCH_rmse, num_points)
+
+print("GRANCH_cor")
+print(GRANCH_cor)
+
+print("GRANCH_rmse")
+print(GRANCH_rmse)
+
+print("GRANCH_rmse_interval")
+print(GRANCH_rmse_interval)
+
+Nonoise_cor = cor.test(plot_df %>% filter(value_type == "No noise") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value))
+
+Nonoise_rmse = rmse(plot_df %>% filter(value_type == "No noise") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value)) * 1000
+
+Nonoise_rmse_interval = rmse_interval(Nonoise_rmse, num_points)
+
+print("Nonoise_cor")
+print(Nonoise_cor)
+
+print("Nonoise_rmse")
+print(Nonoise_rmse)
+
+print("Nonoise_rmse_interval")
+print(Nonoise_rmse_interval)
+
+
+Nolearning_cor = cor.test(plot_df %>% filter(value_type == "No learning") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value))
+
+Nolearning_rmse = rmse(plot_df %>% filter(value_type == "No learning") %>% pull(value), plot_df %>% filter(value_type == "Infants") %>% pull(value)) * 1000
+
+Nolearning_rmse_interval = rmse_interval(Nolearning_rmse, num_points)
+
+print("Nolearning_cor")
+print(Nolearning_cor)
+
+print("Nolearning_rmse")
+print(Nolearning_rmse)
+
+print("Nolearning_rmse_interval")
+print(Nolearning_rmse_interval)
+
+
+
+```
