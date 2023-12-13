@@ -1,0 +1,15 @@
+
+```{r}
+library(tidyverse)
+library(here)
+
+d <- read_csv(here("sim_res/01_param_search_summarized/surprisal_summarized.csv"))
+```
+
+```{r}
+d %>% 
+  distinct(trial_id, param_id, sample_n_mean, sample_n_std, fam_duration, test_type) %>% 
+  ggplot(aes(x = fam_duration, y = sample_n_mean, color = test_type)) + 
+  stat_summary(fun.data = "mean_cl_boot")
+```
+
