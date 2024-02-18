@@ -6,8 +6,7 @@ library(here)
 model_results_path = "sim_res/cluster_results/infants/aligned/"
 
 
-model_results = read_csv("/Users/galraz/Developer/RANCH_analysis/sim_res/cluster_results/infants/aligned/summarized_output_EIG.csv")
-
+model_results = read_csv(here(model_results_path, "summarized_output_EIG.csv"))
 
 
 ```
