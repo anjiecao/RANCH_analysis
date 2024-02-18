@@ -1,0 +1,13 @@
+```{r}
+library(tidyverse)
+library(here)
+
+# Load model results
+model_results_path = "sim_res/cluster_results/infants/aligned/"
+
+
+model_results = read_csv("/Users/galraz/Developer/RANCH_analysis/sim_res/cluster_results/infants/aligned/summarized_output_EIG.csv")
+
+
+
+```
