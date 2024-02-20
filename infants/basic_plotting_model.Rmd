@@ -3,10 +3,80 @@ library(tidyverse)
 library(here)
 
 # Load model results
-model_results_path = "sim_res/cluster_results/infants/aligned/"
+model_results_path = "sim_res/cluster_results/infants/"
+
+EIG_unscaled = read_csv(here(model_results_path, "aligned/summarized_output_EIG_unscaled.csv"))
+EIG_scaled = read_csv(here(model_results_path, "aligned/summarized_output_EIG.csv"))
+EIG_param_info = read_csv(here(model_results_path, "sim_info/param_info/eig.csv"))
+
+KL_unscaled = read_csv(here(model_results_path, "aligned/summarized_output_KL_unscaled.csv"))
+KL_scaled = read_csv(here(model_results_path, "aligned/summarized_output_KL.csv"))
+KL_param_info = read_csv(here(model_results_path, "sim_info/param_info/KL.csv"))
+
+trial_info = read_csv(here(model_results_path, "sim_info/trial_info/trial_info_exposure_duration.csv"))
 
 
-model_results = read_csv(here(model_results_path, "summarized_output_EIG.csv"))
+
+```
+
+
+# Exposure duration stuff
+```{r}
+
+pooled_sd <- function(sd, n) {
+  sqrt(sum((n - 1) * sd^2) / sum(n - 1))
+}
+
+## EIG
+
+# unscaled
+eig_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(EIG_unscaled, by = c("trial_id", "stim_id")) %>% 
+  select(param_id, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  right_join(EIG_param_info, by = c('param_id')) 
+
+eig_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG unscaled')
+
+
+# scaled
+eig_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(EIG_scaled, by = c("trial_id", "stim_id")) %>% 
+  select(param_id, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  right_join(EIG_param_info, by = c('param_id')) 
+
+eig_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
+
+## KL
+
+KL_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(KL_unscaled, by = c("trial_id", "stim_id")) %>% 
+  select(param_id, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  right_join(KL_param_info, by = c('param_id')) 
+
+KL_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('KL unscaled')
+
+
+# scaled
+KL_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(KL_scaled, by = c("trial_id", "stim_id")) %>% 
+  select(param_id, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  right_join(KL_param_info, by = c('param_id')) 
+
+KL_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('KL scaled')
+
+```
+
+
+
+```{r}
 
 
 ```
