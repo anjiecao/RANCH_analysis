@@ -3,7 +3,7 @@ library(tidyverse)
 library(here)
 
 # Load model results
-model_results_path = "sim_res/cluster_results/infants/"
+model_results_path = "simulations/cluster_results/exposure_duration/infants"
 
 EIG_unscaled = read_csv(here(model_results_path, "aligned/summarized_output_EIG_unscaled.csv"))
 EIG_scaled = read_csv(here(model_results_path, "aligned/summarized_output_EIG.csv"))

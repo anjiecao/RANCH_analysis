@@ -3,12 +3,49 @@
 library(tidyverse)
 library(here)
 library(colf)
+library(ggthemes)
 library(Metrics)
+
 bd <- read_csv(here("adults/exposure_duration_d.csv"))
-resnet_sd <- read_csv(here("sim_res/cluster_results/adults/aligned/summarized_output_EIG.csv"))
-trial_info <- read_csv(here("sim_res/sim_info/trial_info_exposure_duration.csv"))
+
+adult_eig <- read_csv(here("simulations/cluster_results/exposure_duration/adults/aligned/summarized_output_EIG.csv"))
+trial_info <- read_csv(here("simulations/cluster_results/exposure_duration/adults/sim_info/trial_info/trial_info_exposure_duration.csv"))
 
 ```
+
+# file checking: 
+
+```{r}
+adult_eig <- read_csv(here("simulations/cluster_results/exposure_duration/adults/aligned/summarized_output_EIG.csv"))
+trial_info <- read_csv(here("simulations/cluster_results/exposure_duration/adults/sim_info/trial_info/trial_info_exposure_duration.csv"))
+
+eig_summarized <- trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(adult_eig, by = c("trial_id", "stim_id")) %>% 
+  mutate(trial_number = index + 1) %>% 
+  select(param_id, trial_number, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  mutate(trial_type = violation_type, 
+         trial_type = if_else(trial_type == "identity", "deviant", "background")) %>% 
+  select(param_id, trial_type, fam_duration, trial_number, sample_n_mean, sample_n_std) %>% 
+  group_by(param_id, trial_type, trial_number) %>% 
+  summarise(
+    count = n(),
+    #ssd = sum((20-1) * (sample_n_std ** 2)),
+    #sd_sample = (ssd / 20 * count - count) ** .5, 
+    sd_sample = pooled_sd(sample_n_std, 20),
+    mean_sample = mean(sample_n_mean), 
+    ub_sample = mean_sample + 1.96 * (sd_sample /((400 * count) ** .5)),
+    lb_sample = mean_sample - 1.96 * (sd_sample /((400 * count) ** .5)),) %>% # missing SD here!
+  ungroup() 
+
+eig_summarized %>% 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
+  theme_few()
+```
+
+
+
 
 ```{r}
 # Function to calculate pooled standard deviation
@@ -22,14 +59,33 @@ pooled_sd <- function(sd, n) {
 #count = group['n_samples_sd'].count()
 #return np.sqrt(ssd / (n * count - count))
 
+
+eig_summarized = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(EIG_scaled, by = c("trial_id", "stim_id")) %>% 
+  select(param_id, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+  right_join(EIG_param_info, by = c('param_id')) %>% 
+  mutate(trial_type = violation_type, 
+         trial_type = if_else(trial_type == "identity", "deviant", "background")) %>% 
+  group_by(param_id, trial_type, fam_duration) %>% 
+  summarise(
+    count = n(),
+    #ssd = sum((20-1) * (sample_n_std ** 2)),
+    #sd_sample = (ssd / 20 * count - count) ** .5, 
+    sd_sample = pooled_sd(sample_n_std, 20),
+    mean_sample = mean(sample_n_mean), 
+    ub_sample = mean_sample + 1.96 * (sd_sample /((400 * count) ** .5)),
+    lb_sample = mean_sample - 1.96 * (sd_sample /((400 * count) ** .5)),) %>% # missing SD here!
+  ungroup() 
+
 eig_summarized <- trial_info %>% 
   distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
-  right_join(resnet_sd, by = c("trial_id", "stim_id")) %>% 
+  right_join(adult_eig, by = c("trial_id", "stim_id")) %>% 
   mutate(trial_number = index + 1) %>% 
   select(param_id, trial_number, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
   mutate(trial_type = violation_type, 
          trial_type = if_else(trial_type == "identity", "deviant", "background")) %>% 
-  select(param_id, trial_type, trial_number, sample_n_mean, sample_n_std) %>% 
+  select(param_id, trial_type, fam_duration, trial_number, sample_n_mean, sample_n_std) %>% 
   group_by(param_id, trial_type, trial_number) %>% 
   summarise(
     count = n(),
@@ -60,9 +116,9 @@ run_k_fold <- function(p_id, raw_d, sd){
     
     # separate the data in to train & test
     train_subject = sample(all_sbj, floor(length(all_sbj) * .9))
-    train_data = summarize_behavioral_data(raw_d %>% filter(prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
+    train_data = summarize_behavioral_data(raw_d %>% filter(prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "trial_type")) %>% 
       filter(trial_number != 11)
-    test_data = summarize_behavioral_data(raw_d %>% filter(!prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
+    test_data = summarize_behavioral_data(raw_d %>% filter(!prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "trial_type")) %>% 
       filter(trial_number != 11)
     
     # fit the training set
@@ -105,7 +161,8 @@ run_k_fold <- function(p_id, raw_d, sd){
 summarize_behavioral_data <- function(raw_d){
   
   bd_fit_summary <- raw_d %>% 
-    group_by(trial_number, trial_type) %>% 
+    mutate(fam_duration = exposure_duration) %>% 
+    group_by(trial_number,fam_duration,  trial_type) %>% 
     summarise(mean_lt = mean(total_rt), 
               count = n(),
               #ssd = sum((20-1) * (sample_n_std ** 2)),
@@ -121,8 +178,9 @@ full_k_fold_res <- lapply(
   unique(resnet_sd$param_id), 
   function(id){
     run_k_fold(p_id = id, 
-               raw_d = bd, 
-               sd = eig_summarized)
+               raw_d = bd %>% filter(trial_number != 11, exposure_duration != 10), 
+               sd = eig_summarized %>% filter(fam_duration != 10))
+  
   }
 ) %>% 
   bind_rows()
@@ -134,17 +192,41 @@ d %>% group_by(param_id, trial_id) %>% count()
 
 
 ```{r}
-eig_summarized %>% 
-  mutate(trial_type_overall = if_else(trial_type == "background", "background", "deviant")) %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type_overall)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2)) 
+
+full_k_fold_res %>% 
+  ggplot(aes(x = mean_rsquared)) + 
+  geom_histogram() + 
+   labs(title = "by fam duration, mean r square")
 
 eig_summarized %>% 
-  filter(param_id == 94) %>% 
-  mutate(trial_type_overall = if_else(trial_type == "background", "background", "deviant")) %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type_overall)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2)) 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
+  theme_few() + 
+  labs(title = "by trial number, model fits")
+
+
+bd %>% 
+  #filter(trial_number != 11) %>% 
+  mutate(fam_duration = exposure_duration) %>% 
+   ggplot(aes(x = fam_duration, y = total_rt, color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
+  theme_few() + 
+  labs(title = "by fam duration, behavioral")
+
+
+eig_summarized %>% 
+  filter(param_id == 93) %>% 
+  ggplot(aes(x = fam_duration, y = mean_sample, color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2)) + 
+  theme_few() + 
+  labs(title = "by fam duration, best fits")
 ```
+
+
+```{r}
+eig_summarized
+```
+
 
 ```{r}
 d %>% 
