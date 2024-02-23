@@ -16,6 +16,8 @@ unlinked_param_info_folder_path <- "simulations/sim_adult_exposure_duration/para
 
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
 unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_eig.csv"))
+unlinked_aligned_unscaledallstims_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_unscaledallstims_eig.csv"))
+
 unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_aligned_eig.csv"))
 
 
@@ -24,17 +26,106 @@ linked_aligned_eig <- connect_files(trial_info = trial_info,
                                     sim_data = unlinked_aligned_eig)
 
 
+linked_aligned_unscaledallstims_eig <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, 
+                                    sim_data = unlinked_aligned_unscaledallstims_eig)
+
 
 # write out the csv
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv"))
+write_csv(linked_aligned_unscaledallstims_eig, here(linked_folder_path, "linked_aligned_unscaledallstims_eig.csv"))
 ```
 
 ## sanity check 
 
 ```{r}
-linked_aligned_eig %>% 
+linked_aligned_unscaledallstims_eig %>% 
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few()
 ```
+relationship between embedding distance and dishabituation magnitude 
+
+```{r}
+raw_stim_df <- trial_info %>% 
+    distinct(trial_id, stim_id, fam_duration, violation_type, .keep_all = TRUE) %>% 
+    right_join(unlinked_aligned_unscaledallstims_eig, by = c("trial_id", "stim_id")) %>% 
+    #select(param_id, index, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
+    right_join(param_info, by = c('param_id')) %>%
+    mutate(trial_type = case_when(
+      violation_type == "background" ~ "background", 
+      violation_type == "identity" & (index == fam_duration ) ~ "deviant",
+      TRUE ~ "background"))%>% 
+    mutate(trial_number = index + 1) %>% 
+  select(sample_n_mean, sample_n_std, fam, test, violation_type, trial_number)
+
+```
+
+```{r}
+index_present <- paste0("0", as.character(seq(13, 40)))
+
+emb_df <- read_csv(here("embeddings/aligned_unscaledallstimuli_distance.csv")) %>% 
+ rename("stimulus" = "...1") %>% 
+ filter(grepl("adults", stimulus) | grepl(paste(index_present, collapse="|"), stimulus)) %>% 
+#select(contains("stimulus")|contains("adults") ) %>% 
+  filter(!grepl("pair", stimulus)) 
+
+emb_df <- emb_df %>% 
+  select(stimulus, matches(paste(emb_df %>% pull(stimulus), collapse="|"))) 
+
+emb_df %>% 
+  arrange(stimulus)
+
+distinct_stimulus_pair <- raw_stim_df %>% 
+  distinct(fam, test) %>% 
+  filter(fam != test)
+```
+
+```{r}
+replace_name <- function(x){gsub("_adults", "", x)}
+
+emb_df_lookup <- emb_df %>% 
+  mutate(stimulus = gsub("_adults", "", stimulus)) %>% 
+  rename_with(~replace_name(.))
+
+
+
+get_distance <- function(stim_a_name, stim_b_name,  dist){
+  if (stim_a_name  == "" | stim_b_name  == ""){
+    return (tibble("val" = NA_real_))
+  }else{
+    return( 
+      tibble("val" = dist %>%
+      filter(stimulus == {{stim_b_name}}) %>% 
+      select({{stim_a_name}}) %>% 
+      pull())
+      )
+  }
+  
+}
+
+distinct_stimulus_pair_with_distance <- distinct_stimulus_pair %>% 
+  ungroup() %>% 
+  mutate(edist = map2_df(.x = distinct_stimulus_pair$fam, 
+                        .y = distinct_stimulus_pair$test, 
+                        .f = get_distance, emb_df_lookup)) %>% 
+  unnest(edist)
+
+```
+
+```{r}
+
+stim_df_with_dist <- raw_stim_df %>% 
+  left_join(distinct_stimulus_pair_with_distance %>% rename("dist" = val), 
+            by = c("fam", "test")) %>% 
+  mutate(dist = if_else(is.na(dist), 0, dist)) 
+
+stim_df_with_dist %>% 
+  filter(violation_type != "background") %>% 
+  ggplot(aes(x = dist, y = sample_n_mean)) + 
+  geom_point(aes(alpha = .3)) + 
+  geom_smooth() + 
+  facet_wrap(~trial_number)
+```
+
 
