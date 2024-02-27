@@ -8,7 +8,7 @@ library(Metrics)
 source(here("helper/run_k_fold.R"))
 
 bd <- read_csv(here("adults/adult_exposure_duration.csv"))
-aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_eig.csv"))
+aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_unscaledallstims_eig.csv"))
 ```
 
 
@@ -26,6 +26,11 @@ full_k_fold_res <- lapply(
 ```
 
 
+```{r}
+
+```
+
+
 
 ```{r}
 
@@ -39,6 +44,7 @@ aligned_eig %>%
   theme_few() 
 
 
+ 
 bd %>% 
   #filter(trial_number != 11) %>% 
    ggplot(aes(x = fam_duration, y = total_rt, color = trial_type)) + 
