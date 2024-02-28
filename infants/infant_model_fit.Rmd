@@ -1,0 +1,117 @@
+Import libraries
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(Metrics)
+library(broom.mixed)
+library(confintr)
+library(colf)
+library(optimx)
+library(lmerTest)
+library(ggeffects)
+source(here("helper/run_k_fold.R"))
+
+
+```
+
+# Load data and model sims
+```{r}
+
+infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% filter(fam_or_test == 'test', !exclude)
+
+# unscaled all stims
+model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
+
+# scaled animals only
+#model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig_scaled.csv')) 
+
+
+```
+# Sanity plot model data
+```{r}
+model_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
+
+model_data %>% filter(param_id == 45) %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled, param id = 45')
+
+model_data %>% filter(param_id == 145) %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled, param id = 145')
+
+```
+
+
+# Overall model fit with best fitting parameter
+
+```{r}
+
+# Put infant data in grouped means format
+grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
+
+
+# only keep parameters for which all fam durations have been computed
+model_data <- model_data %>%
+  group_by(param_id, trial_type) %>%
+  filter(all(1:10 %in% trial_number)) %>%
+  ungroup() %>%
+  rename(test_type = trial_type) %>%
+  mutate(fam_duration = trial_number - 1,
+         test_type = case_when(test_type == 'background' ~ 'fam', test_type == 'deviant' ~ 'nov')) 
+
+# remo fam duration = 0 to when deviant
+model_data = model_data %>% filter(!(test_type == 'nov' & fam_duration == 0))
+
+# combine model with data
+combined_df = model_data %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(grouped_infant_means, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+# group by parameter info and find groupwise intercept and slope
+grouped_stats <- combined_df %>%
+  group_by(param_id) %>%
+  do(tidy(lm(LT ~ mean_sample, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  ungroup() %>%
+  spread(term, estimate)
+
+# merge with intercept and slope and scale the samples
+combined_df <- combined_df %>%
+  left_join(grouped_stats, by = c("param_id")) %>% 
+  dplyr::rename(intercept = "(Intercept)", slope = mean_sample.y, n_samples = mean_sample.x) %>% 
+  mutate(scaled_samples = n_samples * slope + intercept) %>% select(-n_samples)
+
+# compute per param_setting correlation and sort by max corr, and select
+top_corr_param = combined_df %>% group_by(param_id) %>% dplyr::summarize(corr = cor(scaled_samples, LT), rmse = rmse(LT, scaled_samples)) %>% arrange(desc(corr)) %>% pull(param_id) %>% first() 
+
+top_sim_result = combined_df %>% filter(param_id == top_corr_param) 
+
+plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infants)` = scaled_samples) %>%
+  pivot_longer(cols = c("RANCH (infants)", "Infant behavior"), names_to = "value_type", values_to = "value") %>% 
+  mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
+        test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
+
+ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + scale_y_continuous(breaks = c(3, 10, 30)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + coord_cartesian(ylim = c(0,35)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+
+  
+
+```
+# Crossvalidation
+```{r}
+
+infant_data = infant_data %>% mutate(subj_id = paste0(experiment, subject_num))
+
+full_k_fold_res <- lapply(
+  unique(model_data$param_id), 
+  function(id){
+    run_subject_wise_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = model_data)
+  }
+) %>% 
+  bind_rows()
+
+
+```
+
+# Crossvalidation
