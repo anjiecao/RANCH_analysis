@@ -13,10 +13,10 @@ run_k_fold <- function(p_id, raw_d, sd){
     
     # separate the data in to train & test
     train_subject = sample(all_sbj, floor(length(all_sbj) * .9))
-    train_data = summarize_behavioral_data(raw_d %>% filter(prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
-      filter(trial_number != 11)
-    test_data = summarize_behavioral_data(raw_d %>% filter(!prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
-      filter(trial_number != 11)
+    train_data = summarize_behavioral_data(raw_d %>% filter(prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) #%>% 
+     # filter(trial_number != 11)
+    test_data = summarize_behavioral_data(raw_d %>% filter(!prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) #%>% 
+      #filter(trial_number != 11)
     
     # fit the training set
     
@@ -52,6 +52,22 @@ run_k_fold <- function(p_id, raw_d, sd){
       
     )
   )
+  
+}
+
+
+link_dataset <- function(p_id, raw_d, sd){
+  
+ 
+  
+  
+
+  data = summarize_behavioral_data(raw_d) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
+    filter(trial_number != 11)
+  
+  
+  return(
+    data)
   
 }
 

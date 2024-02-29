@@ -1,10 +1,9 @@
-
 ```{r}
 library(tidyverse)
+library(ggthemes)
 library(here)
 source(here("simulations/linking_sim_helper.R"))
 ```
-
 
 # sim_adult_exposure_duration
 
@@ -16,7 +15,7 @@ unlinked_param_info_folder_path <- "simulations/sim_adult_exposure_duration/para
 
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
 unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_eig.csv"))
-unlinked_aligned_unscaledallstims_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_unscaledallstims_eig.csv"))
+unlinked_aligned_unscaledallstims_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_unscaledallstims_eig_thurs.csv"))
 
 unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_aligned_eig.csv"))
 
@@ -33,10 +32,10 @@ linked_aligned_unscaledallstims_eig <- connect_files(trial_info = trial_info,
 
 # write out the csv
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv"))
-write_csv(linked_aligned_unscaledallstims_eig, here(linked_folder_path, "linked_aligned_unscaledallstims_eig.csv"))
+write_csv(linked_aligned_unscaledallstims_eig, here(linked_folder_path, "linked_aligned_unscaledallstims_eig_thurs.csv"))
 ```
 
-## sanity check 
+## sanity check
 
 ```{r}
 linked_aligned_unscaledallstims_eig %>% 
@@ -44,20 +43,65 @@ linked_aligned_unscaledallstims_eig %>%
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few()
 ```
-#relationship between embedding distance and dishabituation magnitude 
+
+# relationship between embedding distance and dishabituation magnitude 
+
+## two test 
+
+```{r}
+scaledanimals <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, 
+                                    sim_data = read_csv(here(unlinked_sim_folder_path, "unlinked_test_aligned_scaledanimals_eig.csv"))) %>%  
+  filter(!is.na(trial_number))
+
+unscaledallstims <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, 
+                                    sim_data = read_csv(here(unlinked_sim_folder_path, "unlinked_test_aligned_unscaledallstim_eig.csv"))) %>% 
+  filter(!is.na(trial_number))
+
+write_csv(scaledanimals, here(linked_folder_path, "linked_test_scaledanimals.csv"))
+write_csv(unscaledallstims, here(linked_folder_path, "linked_test_unscaledallstims.csv"))
+
+
+bind_rows(
+  scaledanimals %>% mutate(type = "scaled animals"), 
+  unscaledallstims %>% mutate(type = "unscaled all stim")
+) %>% 
+  group_by(type, param_id) %>% 
+  count()
+```
+
+```{r}
+bind_rows(
+  scaledanimals %>% mutate(type = "scaled animals"), 
+  unscaledallstims %>% mutate(type = "unscaled all stim")
+) %>% 
+ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_pointrange(aes(ymin = lb_sample, ymax = ub_sample)) + 
+  geom_line() + 
+  #geom_line(aes(group = param_id, color = trial_type)) + 
+  theme_few()+ 
+  facet_grid(param_id~type)
+```
+
+
+
+
+
+relationship between embedding distance and dishabituation magnitude
 
 ```{r}
 raw_stim_df <- trial_info %>% 
     distinct(trial_id, stim_id, fam_duration, violation_type, .keep_all = TRUE) %>% 
     right_join(unlinked_aligned_unscaledallstims_eig, by = c("trial_id", "stim_id")) %>% 
     #select(param_id, index, fam_duration, violation_type, sample_n_mean, sample_n_std) %>% 
-    right_join(param_info, by = c('param_id')) %>%
+    right_join(unlinked_param_info_aligned_eig, by = c('param_id')) %>%
     mutate(trial_type = case_when(
       violation_type == "background" ~ "background", 
       violation_type == "identity" & (index == fam_duration ) ~ "deviant",
       TRUE ~ "background"))%>% 
     mutate(trial_number = index + 1) %>% 
-  select(sample_n_mean, sample_n_std, fam, test, violation_type, trial_number)
+  select(sample_n_mean, sample_n_std, fam, test, trial_type, violation_type, trial_number)
 
 ```
 
@@ -121,7 +165,16 @@ stim_df_with_dist <- raw_stim_df %>%
   mutate(dist = if_else(is.na(dist), 0, dist)) 
 
 stim_df_with_dist %>% 
-  filter(violation_type != "background") %>% 
+  filter(trial_type != "background") %>% 
+  ggplot(aes(x = dist, y = sample_n_mean)) + 
+  geom_point(aes(alpha = .3)) + 
+  geom_smooth() + 
+  facet_wrap(~trial_number)
+
+
+stim_df_with_dist %>% 
+  filter(dist < 1) %>% 
+  filter(trial_type != "background") %>% 
   ggplot(aes(x = dist, y = sample_n_mean)) + 
   geom_point(aes(alpha = .3)) + 
   geom_smooth() + 
@@ -129,6 +182,7 @@ stim_df_with_dist %>%
 ```
 
 # Infant linking
+
 ```{r}
 linked_folder_path <- "simulations/sim_infant_exposure_duration/01_linked_sim"
 trial_info_folder_path <- "simulations/sim_infant_exposure_duration"

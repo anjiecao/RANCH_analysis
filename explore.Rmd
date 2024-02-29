@@ -8,9 +8,14 @@ library(Metrics)
 source(here("helper/run_k_fold.R"))
 
 bd <- read_csv(here("adults/adult_exposure_duration.csv"))
-aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_unscaledallstims_eig.csv"))
+
+aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_eig.csv"))
 ```
 
+```{r}
+clean_aligned_eig <- aligned_eig %>% 
+  filter(param_id %in% unique(unlinked_aligned_unscaledallstims_eig$param_id))
+```
 
 
 ```{r}
@@ -23,12 +28,22 @@ full_k_fold_res <- lapply(
   }
 ) %>% 
   bind_rows()
+
+
+all_linked_ds <- lapply(
+  unique(aligned_eig$param_id), 
+  function(id){
+    link_dataset(p_id = id, 
+               raw_d = bd, 
+               sd = aligned_eig)
+  }
+) %>% 
+  bind_rows()
+
 ```
 
 
-```{r}
 
-```
 
 
 
