@@ -5,6 +5,7 @@ library(here)
 # Load model results
 model_results_path = "sim_res/cluster_results/exposure_duration/infants"
 
+
 EIG_unscaled = read_csv(here(model_results_path, "resnet50/summarized_output_EIG_unscaled.csv"))
 EIG_scaled = read_csv(here(model_results_path, "resnet50/summarized_output_EIG.csv"))
 EIG_param_info = read_csv(here(model_results_path, "sim_info/param_info/eig.csv"))
@@ -99,4 +100,248 @@ eig_unscaled = trial_info %>%
 eig_unscaled %>% ggplot(aes(x = index, y = sample_n_mean, color = trial_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG adults')
 
+```
+
+grid size manipulations
+```{r}
+
+param_info_5 = "v1_a0.1_b0.1_sdep_1"
+param_info_17 = "v1_a0.1_b10_sdep_1"
+param_info_107 = "v2_a10_b10_sdep_1"
+
+
+large_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_large_unscaled.csv"))
+regular_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_regular_unscaled.csv"))
+small_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_small_unscaled.csv"))
+supersmall_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_supersmall_unscaled.csv"))
+
+large_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_large_scaled.csv"))
+regular_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_regular_scaled.csv"))
+small_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_small_scaled.csv"))
+supersmall_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/summarized_output_supersmall_scaled.csv"))
+
+trial_info = read_csv(here("simulations/sim_infant_exposure_duration/trial_info.csv"))
+
+supersmall_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(supersmall_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+small_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(small_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+large_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(large_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+regular_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(regular_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+supersmall_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('supersmall grid unscaled') + facet_grid(~param_id) 
+
+small_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('small grid unscaled') + facet_grid(~param_id)
+
+large_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('large grid unscaled') + facet_grid(~param_id)
+
+regular_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid unscaled') + facet_grid(~param_id)
+
+
+
+supersmall_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(supersmall_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+small_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(small_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+large_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(large_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+regular_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(regular_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+supersmall_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('supersmall grid scaled') + facet_grid(~param_id)
+
+small_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('small grid scaled') + facet_grid(~param_id)
+
+large_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('large grid scaled') + facet_grid(~param_id)
+
+regular_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid scaled') + facet_grid(~param_id)
+
+
+```
+```{r}
+
+param_info_5 = "v1_a0.1_b0.1_sdep_1"
+param_info_17 = "v1_a0.1_b10_sdep_1"
+param_info_107 = "v2_a10_b10_sdep_1"
+
+
+large_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_large_unscaled.csv"))
+regular_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_regular_unscaled.csv"))
+small_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_small_unscaled.csv"))
+supersmall_grid_unscaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_supersmall_unscaled.csv"))
+
+large_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_large_scaled.csv"))
+regular_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_regular_scaled.csv"))
+small_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_small_scaled.csv"))
+supersmall_grid_scaled = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/single_stim/summarized_output_supersmall_scaled.csv"))
+
+trial_info = read_csv(here("simulations/sim_infant_exposure_duration/trial_info.csv"))
+
+supersmall_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(supersmall_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+small_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(small_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+large_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(large_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+regular_grid_unscaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(regular_grid_unscaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+supersmall_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('supersmall grid unscaled') + facet_grid(~param_id) 
+
+small_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('small grid unscaled') + facet_grid(~param_id)
+
+large_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('large grid unscaled') + facet_grid(~param_id)
+
+regular_grid_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid unscaled') + facet_grid(~param_id)
+
+
+
+supersmall_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(supersmall_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+small_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(small_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+large_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(large_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+regular_grid_scaled = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(regular_grid_scaled, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+supersmall_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('supersmall grid scaled') + facet_grid(~param_id)
+
+small_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('small grid scaled') + facet_grid(~param_id)
+
+large_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('large grid scaled') + facet_grid(~param_id)
+
+regular_grid_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid scaled') + facet_grid(~param_id)
+
+
+```
+```{r}
+
+
+adult_sim = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/replicate/s.csv"))
+
+trial_info = read_csv(here("simulations/sim_adult_exposure_duration/trial_info.csv"))
+
+adult_sim = trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(adult_sim, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 5 ~ param_info_5,
+                              param_id == 17 ~ param_info_17,
+                              param_id == 107 ~ param_info_107))
+
+```
+
+prior explore
+```{r}
+prior_explore_df = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/prior_explore/summarized_output_prior_explore.csv"))
+trial_info = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/prior_explore/trial_info.csv"))
+
+
+trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(prior_explore_df, by = c("trial_id", "stim_id")) %>%
+  mutate(param_id = case_when(param_id == 35 ~ "v1_a3_b1_sdep_1",
+                              param_id == 66 ~ "v1_a0.1_b0.1_sdep_1")) %>%
+  ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid scaled') + facet_grid(~param_id)
+
+
+
+trial_info %>% 
+  distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+  right_join(prior_explore_df, by = c("trial_id", "stim_id")) %>% group_by(param_id) %>% count()
 ```

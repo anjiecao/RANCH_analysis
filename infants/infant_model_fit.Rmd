@@ -21,7 +21,7 @@ source(here("helper/run_k_fold.R"))
 infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% filter(fam_or_test == 'test', !exclude)
 
 # unscaled all stims
-model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
+model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig_scaled_onlyanimals.csv')) 
 
 # scaled animals only
 #model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig_scaled.csv')) 
@@ -30,6 +30,8 @@ model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_s
 ```
 # Sanity plot model data
 ```{r}
+
+
 model_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
 
@@ -96,10 +98,15 @@ ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test
   
 
 ```
+
+
 # Crossvalidation
 ```{r}
 
 infant_data = infant_data %>% mutate(subj_id = paste0(experiment, subject_num))
+
+param_ids = sample(model_data$param_id,3)
+model_data = model_data %>% filter(param_id %in% param_ids)
 
 full_k_fold_res <- lapply(
   unique(model_data$param_id), 
