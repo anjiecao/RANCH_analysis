@@ -15,7 +15,7 @@ unlinked_param_info_folder_path <- "simulations/sim_adult_exposure_duration/para
 
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
 unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_eig.csv"))
-unlinked_aligned_unscaledallstims_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_unscaledallstims_eig_thurs.csv"))
+
 
 unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_aligned_eig.csv"))
 
@@ -25,20 +25,16 @@ linked_aligned_eig <- connect_files(trial_info = trial_info,
                                     sim_data = unlinked_aligned_eig)
 
 
-linked_aligned_unscaledallstims_eig <- connect_files(trial_info = trial_info, 
-                                    param_info = unlinked_param_info_aligned_eig, 
-                                    sim_data = unlinked_aligned_unscaledallstims_eig)
-
 
 # write out the csv
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv"))
-write_csv(linked_aligned_unscaledallstims_eig, here(linked_folder_path, "linked_aligned_unscaledallstims_eig_thurs.csv"))
+
 ```
 
 ## sanity check
 
 ```{r}
-linked_aligned_unscaledallstims_eig %>% 
+linked_aligned_eig %>% 
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few()

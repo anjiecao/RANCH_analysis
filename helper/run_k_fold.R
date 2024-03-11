@@ -1,4 +1,21 @@
 
+run_all_kfold <- function(sim_data, behavioral_data){
+  
+  full_k_fold_res <- lapply(
+    unique(sim_data$param_id), 
+    function(id){
+      run_k_fold(p_id = id, 
+                 raw_d = behavioral_data, 
+                 sd = sim_data)
+    }
+  ) %>% 
+    bind_rows()
+  
+  return (full_k_fold_res)
+  
+}
+
+
 run_k_fold <- function(p_id, raw_d, sd){
   
   # get all the subjects 
