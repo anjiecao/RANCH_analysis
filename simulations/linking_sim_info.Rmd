@@ -12,9 +12,15 @@ linked_folder_path <- "simulations/sim_adult_exposure_duration/01_linked_sim"
 trial_info_folder_path <- "simulations/sim_adult_exposure_duration"
 unlinked_sim_folder_path <- "simulations/sim_adult_exposure_duration/00_raw_sim"
 unlinked_param_info_folder_path <- "simulations/sim_adult_exposure_duration/param_info"
-
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
+
+
+```
+
+```{r}
 unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligned_eig.csv"))
+
+unlinked_resnet50_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_eig.csv"))
 
 
 unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_aligned_eig.csv"))
@@ -24,17 +30,22 @@ linked_aligned_eig <- connect_files(trial_info = trial_info,
                                     param_info = unlinked_param_info_aligned_eig, 
                                     sim_data = unlinked_aligned_eig)
 
+linked_resnet50_eig <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, 
+                                    sim_data = unlinked_resnet50_eig)
+
 
 
 # write out the csv
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv"))
+write_csv(linked_resnet50_eig, here(linked_folder_path, "linked_resnet50_eig.csv"))
 
 ```
 
 ## sanity check
 
 ```{r}
-linked_aligned_eig %>% 
+linked_resnet50_eig %>% 
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few()

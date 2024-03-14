@@ -10,23 +10,45 @@ source(here("helper/run_k_fold.R"))
 adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
 
 adult_aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_eig.csv"))
+adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
 ```
 
 
 ```{r}
-adult_kfold_aligned_eig = run_all_kfold(sim_data = aligned_eig, behavioral_data = bd)
+adult_kfold_aligned_eig = run_all_kfold(sim_data = aligned_eig, behavioral_data = adult_bd)
+
+adult_kfold_resnet50_eig = run_all_kfold(sim_data = adult_resnet50_eig, behavioral_data = adult_bd)
+
+
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
-
+saveRDS(adult_kfold_resnet50_eig, here("cached_data/adult_kfold_resnet50_eig.Rds"))
 ```
 
 
 
 
 
+```{r}
+adult_kfold_aligned_eig <- readRDS(here("cached_data/adult_kfold_aligned_eig.Rds"))
+adult_kfold_aligned_eig %>% 
+  arrange(-mean_rsquared)
+
+
+adult_resnet50_eig %>% 
+  filter(param_id == 17) %>% 
+  mutate(trial_type = if_else(trial_number == 1 & trial_type == "deviant", "background", trial_type)) %>% 
+  
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_pointrange(aes(ymin = lb_sample, ymax = ub_sample)) +
+  geom_line()+
+  theme_few() 
+```
+
+
 
 ```{r}
 
-full_k_fold_res %>% 
+adult_kfold_resnet50_eig %>% 
   ggplot(aes(x = mean_rsquared)) + 
   geom_histogram() 
 
@@ -37,9 +59,9 @@ aligned_eig %>%
 
 
  
-bd %>% 
+adult_bd %>% 
   #filter(trial_number != 11) %>% 
-   ggplot(aes(x = fam_duration, y = total_rt, color = trial_type)) + 
+   ggplot(aes(x = trial_number, y = total_rt, color = trial_type)) + 
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few() 
 
