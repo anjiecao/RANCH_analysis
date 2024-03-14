@@ -30,6 +30,37 @@ renaming <- function(df) {
 }
 
 
+
+viz_top_param <- function(sim_data, infant_data, top_param) {
+
+combined_df = sim_data %>% mutate(fam_duration = as.integer(fam_duration)) %>%
+  left_join(grouped_infant_means, by = c("test_type", "fam_duration")) %>%
+  filter(!is.na(LT)) 
+
+grouped_stats <- combined_df %>%
+  group_by(param_id) %>%
+  do(tidy(lm(LT ~ mean_sample, data = .))) %>%
+  select(-c(std.error, statistic, p.value)) %>%
+  ungroup() %>%
+  spread(term, estimate)
+
+# merge with intercept and slope and scale the samples
+combined_df <- combined_df %>%
+  left_join(grouped_stats, by = c("param_id")) %>% 
+  dplyr::rename(intercept = "(Intercept)", slope = mean_sample.y, n_samples = mean_sample.x) %>% 
+  mutate(scaled_samples = n_samples * slope + intercept) %>% select(-n_samples)
+
+top_sim_result = combined_df %>% filter(param_id == top_param) 
+
+plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infants)` = scaled_samples) %>%
+  pivot_longer(cols = c("RANCH (infants)", "Infant behavior"), names_to = "value_type", values_to = "value") %>% 
+  mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
+        test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
+
+ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+
+}
+
 ```
 
 # Load data and model sims
@@ -69,15 +100,20 @@ infant_kfold_aligned_eig <- lapply(
 ) %>% 
   bind_rows()
 
+infant_kfold_aligned_eig %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
+
+
 infant_kfold_resnet50_eig <- lapply(
-  unique(aligned_data$param_id), 
+  unique(resnet50_data$param_id), 
   function(id){
     run_subject_wise_crossvalidation(p_id = id, 
                raw_d = infant_data, 
-               sd = resnet50)
+               sd = resnet50_data)
   }
 ) %>% 
   bind_rows()
+
+infant_kfold_resnet50_eig %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
 
 
 saveRDS(infant_kfold_aligned_eig, here("cached_data/infant_kfold_aligned_eig.Rds"))
@@ -85,22 +121,22 @@ saveRDS(infant_kfold_resnet50_eig, here("cached_data/infant_kfold_resnet50_eig.R
 
 ```
 
-# Show top param and cross validation
+# viz top param and cross validation
+
+# resnet50
 
 ```{r}
+grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
 
-full_k_fold_res %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
 
-top_corr = full_k_fold_res %>% arrange(desc(mean_rsquared)) %>% head(1) %>% pull(param_id)
+top_param_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
+viz_top_param(aligned_data, grouped_infant_means, top_param_resnet)
 
-top_sim_result = combined_df %>% filter(param_id == top_corr) 
 
-plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infants)` = scaled_samples) %>%
-  pivot_longer(cols = c("RANCH (infants)", "Infant behavior"), names_to = "value_type", values_to = "value") %>% 
-  mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
-        test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
+top_param_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
+viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50)
 
-ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
 
 
 ```
+
