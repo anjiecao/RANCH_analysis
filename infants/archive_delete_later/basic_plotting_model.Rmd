@@ -327,17 +327,15 @@ adult_sim = trial_info %>%
 
 prior explore
 ```{r}
-prior_explore_df = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/prior_explore/summarized_output_prior_explore.csv"))
-trial_info = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/prior_explore/trial_info.csv"))
+prior_explore_df = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/actual_sims/unlinked_aligned_EIG.csv"))
+trial_info = read_csv(here("simulations/sim_infant_exposure_duration/00_raw_sim/actual_sims/trial_info.csv"))
 
 
 trial_info %>% 
   distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
-  right_join(prior_explore_df, by = c("trial_id", "stim_id")) %>%
-  mutate(param_id = case_when(param_id == 35 ~ "v1_a3_b1_sdep_1",
-                              param_id == 66 ~ "v1_a0.1_b0.1_sdep_1")) %>%
+  right_join(prior_explore_df, by = c("trial_id", "stim_id"))  %>%
   ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
- stat_summary(fun.data = "mean_cl_boot") + ggtitle('regular grid scaled') + facet_grid(~param_id)
+ stat_summary(fun.data = "mean_cl_boot") + theme_classic(20)
 
 
 

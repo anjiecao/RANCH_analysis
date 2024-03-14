@@ -17,20 +17,17 @@ source(here("helper/run_k_fold.R"))
 
 # Load data and model sims
 ```{r}
-
 infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% filter(fam_or_test == 'test', !exclude)
 
 # unscaled all stims
-model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig_scaled_onlyanimals.csv')) 
+model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
 
-# scaled animals only
-#model_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig_scaled.csv')) 
-
+# remove the trial 0 of novel
+model_data = model_data %>% filter(!(trial_number == 1 & trial_type == 'deviant'))
 
 ```
 # Sanity plot model data
 ```{r}
-
 
 model_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
@@ -38,8 +35,8 @@ model_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type
 model_data %>% filter(param_id == 45) %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled, param id = 45')
 
-model_data %>% filter(param_id == 145) %>% ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
- stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled, param id = 145')
+model_data %>% filter(param_id == 107) %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + geom_line() + theme_minimal(20) + ggtitle('EIG, param id = 107')
 
 ```
 
@@ -55,7 +52,7 @@ grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dpl
 # only keep parameters for which all fam durations have been computed
 model_data <- model_data %>%
   group_by(param_id, trial_type) %>%
-  filter(all(1:10 %in% trial_number)) %>%
+  filter(all(2:10 %in% trial_number)) %>%
   ungroup() %>%
   rename(test_type = trial_type) %>%
   mutate(fam_duration = trial_number - 1,
@@ -93,20 +90,17 @@ plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infan
   mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
         test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
 
-ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + scale_y_continuous(breaks = c(3, 10, 30)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + coord_cartesian(ylim = c(0,35)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
 
   
 
 ```
 
 
-# Crossvalidation
+# Crossvalidation (run above blocks first)
 ```{r}
 
 infant_data = infant_data %>% mutate(subj_id = paste0(experiment, subject_num))
-
-param_ids = sample(model_data$param_id,3)
-model_data = model_data %>% filter(param_id %in% param_ids)
 
 full_k_fold_res <- lapply(
   unique(model_data$param_id), 
@@ -121,4 +115,22 @@ full_k_fold_res <- lapply(
 
 ```
 
-# Crossvalidation
+# Show top param and cross validation
+
+```{r}
+
+full_k_fold_res %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
+
+top_corr = full_k_fold_res %>% arrange(desc(mean_rsquared)) %>% head(1) %>% pull(param_id)
+
+top_sim_result = combined_df %>% filter(param_id == top_corr) 
+
+plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infants)` = scaled_samples) %>%
+  pivot_longer(cols = c("RANCH (infants)", "Infant behavior"), names_to = "value_type", values_to = "value") %>% 
+  mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
+        test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
+
+ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+
+
+```
