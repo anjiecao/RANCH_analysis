@@ -22,7 +22,7 @@ unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligne
 
 unlinked_resnet50_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_eig.csv"))
 unlinked_resnet50_nolearning <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nolearning.csv"))
-unlinked_resnet50_nonoise <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nonoise_new.csv"))
+unlinked_resnet50_nonoise <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nonoise.csv"))
 
 
 unlinked_param_info_resnet50_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_eig.csv"))
