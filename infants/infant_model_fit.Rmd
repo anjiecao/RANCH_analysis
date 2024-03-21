@@ -70,16 +70,19 @@ infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% fi
 # load data
 aligned_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
 resnet50_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv')) 
+nonoise_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv'))
 
 # remove the trial 0 of novel
 aligned_data = aligned_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 resnet50_data = resnet50_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
 ```
 
 # Sanity check
 ```{r}
 
-resnet50_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
+nonoise_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
 
 
