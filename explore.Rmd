@@ -11,17 +11,24 @@ adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
 
 adult_aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_eig.csv"))
 adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
+adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
+
 ```
 
 
 ```{r}
 adult_kfold_aligned_eig = run_all_kfold(sim_data = aligned_eig, behavioral_data = adult_bd)
-
 adult_kfold_resnet50_eig = run_all_kfold(sim_data = adult_resnet50_eig, behavioral_data = adult_bd)
+adult_kfold_resnet50_nonoise = run_all_kfold(sim_data = adult_resnet50_nonoise, behavioral_data = adult_bd)
+adult_kfold_resnet50_nolearning = run_all_kfold(sim_data = adult_resnet50_nolearning, behavioral_data = adult_bd)
 
 
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
 saveRDS(adult_kfold_resnet50_eig, here("cached_data/adult_kfold_resnet50_eig.Rds"))
+saveRDS(adult_kfold_resnet50_nonoise, here("cached_data/adult_kfold_resnet50_nonoise.Rds"))
+saveRDS(adult_kfold_resnet50_nolearning, here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
+
 ```
 
 
@@ -34,8 +41,8 @@ adult_kfold_aligned_eig %>%
   arrange(-mean_rsquared)
 
 
-adult_resnet50_eig %>% 
-  filter(param_id == 17) %>% 
+adult_resnet50_nonoise %>% 
+  filter(param_id == 42) %>% 
   mutate(trial_type = if_else(trial_number == 1 & trial_type == "deviant", "background", trial_type)) %>% 
   
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
@@ -48,7 +55,7 @@ adult_resnet50_eig %>%
 
 ```{r}
 
-adult_kfold_resnet50_eig %>% 
+adult_kfold_resnet50_nonoise %>% 
   ggplot(aes(x = mean_rsquared)) + 
   geom_histogram() 
 
