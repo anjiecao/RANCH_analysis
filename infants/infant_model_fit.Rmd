@@ -57,8 +57,11 @@ plot_df = top_sim_result %>% dplyr::rename(`Infant behavior` = LT, `RANCH (infan
   mutate(value_type = factor(value_type, levels = c("Infant behavior", "RANCH (infants)")),
         test_type = ifelse(test_type == 'nov', 'Novel', 'Familiar')) 
 
-ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
+plot = ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group = test_type)) + geom_smooth(method = "lm", size = 2) +  geom_point(size = 3)  + ylab('Looking time (s)') + xlab('fam duration') +  scale_x_continuous(breaks = c(0,1,2,3,4,6,8,9)) + xlab('Exposure duration') + labs(color = 'Test type') + theme(legend.position = "bottom", legend.text = element_text(size = 25)) + facet_grid(~value_type) + theme_classic(30) + scale_color_manual(values = c("blue", "red"))
 
+print(plot)
+
+return(cor(top_sim_result$LT, top_sim_result$scaled_samples))
 }
 
 ```
@@ -132,7 +135,7 @@ infant_kfold_resnet50_nonoise <- lapply(
 ) %>% 
   bind_rows()
 
-infant_kfold_resnet50_eig %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
+infant_kfold_resnet50_nonoise %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
 
 saveRDS(infant_kfold_aligned_eig, here("cached_data/infant_kfold_aligned_eig.Rds"))
 saveRDS(infant_kfold_resnet50_eig, here("cached_data/infant_kfold_resnet50_eig.Rds"))
@@ -143,20 +146,35 @@ saveRDS(infant_kfold_resnet50_nonoise, here("cached_data/infant_kfold_resnet50_n
 
 # viz top param and cross validation
 
-# resnet50
 
 ```{r}
 grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
 
-
 top_param_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-viz_top_param(aligned_data, grouped_infant_means, top_param_resnet)
-
+aligned_overall_corr = viz_top_param(aligned_data, grouped_infant_means, top_param_resnet)
 
 top_param_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50)
+resnet50_overall_corr = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50)
 
+top_param_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
+nonoise_overall_corr = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise)
+
+top_param_nolearning = infant_kfold_resnet50_nolearning %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
+nolearning_overall_corr = viz_top_param(nolearning, grouped_infant_means, top_param_nonoise)
 
 
 ```
+# extract relevant stats
+```{r}
 
+# top crossvalidation stats
+cross_valid_corr_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
+cross_valid_corr_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
+cross_valid_corr_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
+
+stats_df = tibble(sim_type = c('aligned','resnet50','nonoise'), 
+       crossvalidation_corr = c(cross_valid_corr_aligned, cross_valid_corr_resnet50, cross_valid_corr_nonoise), 
+       overall_corr = c(aligned_overall_corr, resnet50_overall_corr, nonoise_overall_corr), 
+       top_param = c(top_param_aligned,top_param_resnet50,top_param_nonoise))
+
+```
