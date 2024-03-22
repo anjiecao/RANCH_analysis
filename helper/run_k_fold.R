@@ -15,12 +15,33 @@ run_all_kfold <- function(sim_data, behavioral_data){
   
 }
 
+split_vector_into_chunks <- function(vec){
+  n <- length(vec) # Includes NA in the count
+  base_size <- n %/% 10
+  extra_elements <- n %% 10
+  
+  sizes <- rep(base_size, 10)
+  sizes[1:extra_elements] = sizes[1:extra_elements] + 1
+  
+  chunks <- vector("list", length = 10)
+  start_index <- 1
+  for (i in 1:10) {
+    end_index <- start_index + sizes[i] - 1
+    chunks[[i]] <- vec[start_index:end_index]
+    start_index <- end_index + 1
+  }
+  
+  return(chunks)
+}
 
 run_k_fold <- function(p_id, raw_d, sd){
   
   # get all the subjects 
   all_sbj <- unique(raw_d$prolific_id)
   n_folds = 10
+  
+  folds = split_vector_into_chunks(all_sbj)
+
   
   # currently testing on one set of parameter 
   rsquared <- vector(mode = "list", length = n_folds)
@@ -29,7 +50,7 @@ run_k_fold <- function(p_id, raw_d, sd){
   for (k in 1:n_folds){
     
     # separate the data in to train & test
-    train_subject = sample(all_sbj, floor(length(all_sbj) * .9))
+    train_subject = folds[[k]]
     train_data = summarize_behavioral_data(raw_d %>% filter(prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) #%>% 
      # filter(trial_number != 11)
     test_data = summarize_behavioral_data(raw_d %>% filter(!prolific_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) #%>% 

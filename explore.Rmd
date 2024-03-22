@@ -13,22 +13,27 @@ adult_aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_l
 adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
 adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
 adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
+adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
+adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
 
 ```
 
 
 ```{r}
-adult_kfold_aligned_eig = run_all_kfold(sim_data = aligned_eig, behavioral_data = adult_bd)
+adult_kfold_aligned_eig = run_all_kfold(sim_data = adult_aligned_eig, behavioral_data = adult_bd)
 adult_kfold_resnet50_eig = run_all_kfold(sim_data = adult_resnet50_eig, behavioral_data = adult_bd)
 adult_kfold_resnet50_nonoise = run_all_kfold(sim_data = adult_resnet50_nonoise, behavioral_data = adult_bd)
 adult_kfold_resnet50_nolearning = run_all_kfold(sim_data = adult_resnet50_nolearning, behavioral_data = adult_bd)
+adult_kfold_resnet50_kl = run_all_kfold(sim_data = adult_resnet50_kl, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
 
 
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
 saveRDS(adult_kfold_resnet50_eig, here("cached_data/adult_kfold_resnet50_eig.Rds"))
 saveRDS(adult_kfold_resnet50_nonoise, here("cached_data/adult_kfold_resnet50_nonoise.Rds"))
 saveRDS(adult_kfold_resnet50_nolearning, here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
-
+saveRDS(adult_kfold_resnet50_kl, here("cached_data/adult_kfold_resnet50_kl.Rds"))
+saveRDS(adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
 ```
 
 
@@ -41,10 +46,9 @@ adult_kfold_aligned_eig %>%
   arrange(-mean_rsquared)
 
 
-adult_resnet50_nonoise %>% 
-  filter(param_id == 42) %>% 
+adult_resnet50_surprisal %>% 
+  filter(param_id == 207) %>% 
   mutate(trial_type = if_else(trial_number == 1 & trial_type == "deviant", "background", trial_type)) %>% 
-  
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
   geom_pointrange(aes(ymin = lb_sample, ymax = ub_sample)) +
   geom_line()+
@@ -55,7 +59,7 @@ adult_resnet50_nonoise %>%
 
 ```{r}
 
-adult_kfold_resnet50_nonoise %>% 
+adult_kfold_resnet50_surprisal %>% 
   ggplot(aes(x = mean_rsquared)) + 
   geom_histogram() 
 

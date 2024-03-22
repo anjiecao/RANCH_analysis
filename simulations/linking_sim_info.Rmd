@@ -23,11 +23,15 @@ unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_aligne
 unlinked_resnet50_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_eig.csv"))
 unlinked_resnet50_nolearning <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nolearning.csv"))
 unlinked_resnet50_nonoise <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nonoise.csv"))
+unlinked_resnet50_kl <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_kl.csv"))
+unlinked_resnet50_surprisal <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_surprisal.csv"))
 
 
 unlinked_param_info_resnet50_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_eig.csv"))
 unlinked_param_info_resnet50_no_learning <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_no_learning.csv"))
 unlinked_param_info_resnet50_no_noise <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_no_noise.csv"))
+unlinked_param_info_resnet50_kl <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_kl.csv"))
+unlinked_param_info_resnet50_surprisal <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_surprisal.csv"))
 
 
 
@@ -43,6 +47,12 @@ linked_resnet50_nolearning <-  connect_files(trial_info = trial_info,
 linked_resnet50_nonoise<-  connect_files(trial_info = trial_info, 
                                     param_info = unlinked_param_info_resnet50_no_noise, 
                                     sim_data = unlinked_resnet50_nonoise)
+linked_resnet50_kl <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_resnet50_kl, 
+                                    sim_data = unlinked_resnet50_kl)
+linked_resnet50_surprisal <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_resnet50_surprisal, 
+                                    sim_data = unlinked_resnet50_surprisal)
 
 
 
@@ -51,6 +61,8 @@ write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv")
 write_csv(linked_resnet50_eig, here(linked_folder_path, "linked_resnet50_eig.csv"))
 write_csv(linked_resnet50_nolearning, here(linked_folder_path, "linked_resnet50_nolearning.csv"))
 write_csv(linked_resnet50_nonoise, here(linked_folder_path, "linked_resnet50_nonoise.csv"))
+write_csv(linked_resnet50_kl, here(linked_folder_path, "linked_resnet50_kl.csv"))
+write_csv(linked_resnet50_surprisal, here(linked_folder_path, "linked_resnet50_surprisal.csv"))
 
 ```
 
