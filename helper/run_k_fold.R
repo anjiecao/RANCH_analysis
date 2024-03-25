@@ -152,8 +152,12 @@ run_subject_wise_crossvalidation <- function(p_id, raw_d, sd){
   
   for (k in 1:n_folds){
     
+    # generate index
+    ind = rep(TRUE, n_folds)
+    ind[k] = FALSE
+    
     # separate the data in to train & test
-    train_subject = sample(all_sbj, n_folds - 1)
+    train_subject = all_sbj[ind]
     train_data = summarize_behavioral_data_infants(raw_d %>% filter(subj_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
     test_data = summarize_behavioral_data_infants(raw_d %>% filter(!subj_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
     
@@ -206,13 +210,19 @@ run_splithalf_crossvalidation <- function(p_id, raw_d, sd){
   ind <- sample(c(TRUE, FALSE), length(all_sbj), replace=TRUE, prob=c(0.5, 0.5))
 
   # create two equal sets
-  set1 =  all_sbj[ind, ]
-  set2 = all_sbj[!ind, ]
+  set1 = all_sbj[ind]
+  set2 = all_sbj[!ind]
   
   for (k in 1:n_folds){
     
     # separate the data in to train & test
-    train_subject = sample(all_sbj, length(all_sbj) / 2)
+    if (k==1) {
+      train_subject = set1
+    }
+    else {
+      train_subject = set2
+    }
+    
     train_data = summarize_behavioral_data_infants(raw_d %>% filter(subj_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
     test_data = summarize_behavioral_data_infants(raw_d %>% filter(!subj_id %in% train_subject)) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
     

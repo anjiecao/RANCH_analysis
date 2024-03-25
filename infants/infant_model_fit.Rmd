@@ -61,7 +61,7 @@ plot = ggplot(plot_df, aes(x = fam_duration, y = value, color = test_type, group
 
 print(plot)
 
-return(cor(top_sim_result$LT, top_sim_result$scaled_samples))
+return(c(cor(top_sim_result$LT, top_sim_result$scaled_samples)^2, rmse(top_sim_result$LT, top_sim_result$scaled_samples)))
 }
 
 ```
@@ -73,11 +73,17 @@ infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% fi
 # load data
 aligned_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
 resnet50_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv')) 
+KL_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_KL.csv'))
+surprisal_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv'))
 nonoise_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv'))
 
-# remove the trial 0 of novel
+
+# remove the trial 0 of novel and some renaming
 aligned_data = aligned_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 resnet50_data = resnet50_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+KL_data = KL_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+surprisal_data = surprisal_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
 nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 
 ```
@@ -108,7 +114,6 @@ infant_kfold_aligned_eig <- lapply(
 ) %>% 
   bind_rows()
 
-infant_kfold_aligned_eig %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
 
 # resnet 50 EIG
 infant_kfold_resnet50_eig <- lapply(
@@ -121,7 +126,27 @@ infant_kfold_resnet50_eig <- lapply(
 ) %>% 
   bind_rows()
 
-infant_kfold_resnet50_eig %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
+# resnet 50 KL
+infant_kfold_resnet50_KL <- lapply(
+  unique(KL_data$param_id), 
+  function(id){
+    run_subject_wise_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = KL_data)
+  }
+) %>% 
+  bind_rows()
+
+# resnet 50 surprisal
+infant_kfold_resnet50_surprisal <- lapply(
+  unique(surprisal_data$param_id), 
+  function(id){
+    run_subject_wise_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = surprisal_data)
+  }
+) %>% 
+  bind_rows()
 
 
 # resnet 50 nonoise
@@ -135,11 +160,13 @@ infant_kfold_resnet50_nonoise <- lapply(
 ) %>% 
   bind_rows()
 
-infant_kfold_resnet50_nonoise %>% ggplot(aes(x = mean_rsquared)) + geom_histogram() + theme_minimal()
 
 saveRDS(infant_kfold_aligned_eig, here("cached_data/infant_kfold_aligned_eig.Rds"))
 saveRDS(infant_kfold_resnet50_eig, here("cached_data/infant_kfold_resnet50_eig.Rds"))
+saveRDS(infant_kfold_resnet50_KL, here("cached_data/infant_kfold_resnet50_KL.Rds"))
+saveRDS(infant_kfold_resnet50_surprisal, here("cached_data/infant_kfold_resnet50_surprisal.Rds"))
 saveRDS(infant_kfold_resnet50_nonoise, here("cached_data/infant_kfold_resnet50_nonoise.Rds"))
+saveRDS(infant_kfold_resnet50_nolearning, here("cached_data/infant_kfold_resnet50_nolearning.Rds"))
 
 
 ```
@@ -149,10 +176,10 @@ saveRDS(infant_kfold_resnet50_nonoise, here("cached_data/infant_kfold_resnet50_n
 ```{r}
 
 # aligned EIG
-infant_kfold_aligned_eig <- lapply(
+infant_splithalf_aligned_eig <- lapply(
   unique(aligned_data$param_id), 
   function(id){
-    run_subject_wise_crossvalidation(p_id = id, 
+    run_splithalf_crossvalidation(p_id = id, 
                raw_d = infant_data, 
                sd = aligned_data)
   }
@@ -161,10 +188,10 @@ infant_kfold_aligned_eig <- lapply(
 
 
 # resnet 50 EIG
-infant_kfold_resnet50_eig <- lapply(
+infant_splithalf_resnet50_eig <- lapply(
   unique(resnet50_data$param_id), 
   function(id){
-    run_subject_wise_crossvalidation(p_id = id, 
+    run_splithalf_crossvalidation(p_id = id, 
                raw_d = infant_data, 
                sd = resnet50_data)
   }
@@ -172,17 +199,57 @@ infant_kfold_resnet50_eig <- lapply(
   bind_rows()
 
 
+# resnet 50 KL
+infant_splithalf_resnet50_KL <- lapply(
+  unique(KL_data$param_id), 
+  function(id){
+    run_splithalf_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = KL_data)
+  }
+) %>% 
+  bind_rows()
+
+# resnet 50 surprisal
+infant_splithalf_resnet50_surprisal <- lapply(
+  unique(surprisal_data$param_id), 
+  function(id){
+    run_splithalf_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = surprisal_data)
+  }
+) %>% 
+  bind_rows()
+
+
 # resnet 50 nonoise
-infant_kfold_resnet50_nonoise <- lapply(
+infant_splithalf_resnet50_nonoise <- lapply(
   unique(nonoise_data$param_id), 
   function(id){
-    run_subject_wise_crossvalidation(p_id = id, 
+    run_splithalf_crossvalidation(p_id = id, 
                raw_d = infant_data, 
                sd = nonoise_data)
   }
 ) %>% 
   bind_rows()
 
+# resnet 50 nolearning
+infant_splithalf_resnet50_nolearning <- lapply(
+  unique(nonoise_data$param_id), 
+  function(id){
+    run_splithalf_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = nonoise_data)
+  }
+) %>% 
+  bind_rows()
+
+saveRDS(infant_splithalf_aligned_eig, here("cached_data/infant_splithalf_aligned_eig.Rds"))
+saveRDS(infant_splithalf_resnet50_eig, here("cached_data/infant_splithalf_resnet50_eig.Rds"))
+saveRDS(infant_splithalf_resnet50_KL, here("cached_data/infant_splithalf_resnet50_KL.Rds"))
+saveRDS(infant_splithalf_resnet50_surprisal, here("cached_data/infant_splithalf_resnet50_surprisal.Rds"))
+saveRDS(infant_splithalf_resnet50_nonoise, here("cached_data/infant_splithalf_resnet50_nonoise.Rds"))
+saveRDS(infant_splithalf_resnet50_nolearning, here("cached_data/infant_splithalf_resnet50_nolearning.Rds"))
 
 ```
 
@@ -193,31 +260,72 @@ infant_kfold_resnet50_nonoise <- lapply(
 ```{r}
 grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
 
-top_param_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-aligned_overall_corr = viz_top_param(aligned_data, grouped_infant_means, top_param_resnet)
 
-top_param_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-resnet50_overall_corr = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50)
+# kfold
+top_param_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared))  %>% first()
+aligned_overall_res = viz_top_param(aligned_data, grouped_infant_means, top_param_aligned$param_id)
 
-top_param_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-nonoise_overall_corr = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise)
+top_param_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% first()
+resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
 
-top_param_nolearning = infant_kfold_resnet50_nolearning %>% arrange(desc(mean_rsquared)) %>% pull(param_id) %>% first()
-nolearning_overall_corr = viz_top_param(nolearning, grouped_infant_means, top_param_nonoise)
+top_param_KL = infant_kfold_resnet50_KL %>% arrange(desc(mean_rsquared)) %>% first()
+resnet50_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
 
+top_param_surprisal = infant_kfold_resnet50_surprisal %>% arrange(desc(mean_rsquared)) %>% first()
+resnet50_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
+
+top_param_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared))  %>% first()
+nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
+
+top_param_nolearning = infant_kfold_resnet50_nolearning %>% arrange(desc(mean_rsquared)) %>% first()
+nolearning_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id)
+
+kfold_top_params = c(top_param_aligned$param_id, top_param_resnet50$param_id, top_param_KL$param_id,  top_param_surprisal$param_id, top_param_nonoise$param_id, top_param_nolearning$param_id)
+kfold_crossvalid_rsquared = c(top_param_aligned$mean_rsquared, top_param_resnet50$mean_rsquared, top_param_KL$mean_rsquared,  top_param_surprisal$mean_rsquared, top_param_nonoise$mean_rsquared, top_param_nolearning$mean_rsquared)
+kfold_crossvalid_rmse = c(top_param_aligned$mean_rmse, top_param_resnet50$mean_rmse, top_param_KL$mean_rmse,  top_param_surprisal$mean_rmse, top_param_nonoise$mean_rmse, top_param_nolearning$mean_rmse)
+kfold_overall_rsquared = c(aligned_overall_res[1], resnet50_overall_res[1], kl_overall_res[1], surprisal_overall_res[1], nonoise_overall_res[1], nolearning_overall_res[1])
+kfold_overall_rmse = c(aligned_overall_res[2], resnet50_overall_res[2], kl_overall_res[2], surprisal_overall_res[2], nonoise_overall_res[2], nolearning_overall_res[2])
+
+# splithalf
+top_param_aligned = infant_splithalf_aligned_eig %>% arrange(desc(mean_rsquared)) %>% first()
+aligned_overall_res = viz_top_param(aligned_data, grouped_infant_means, top_param_aligned$param_id)
+
+top_param_resnet50 = infant_splithalf_resnet50_eig %>% arrange(desc(mean_rsquared))  %>% first()
+resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
+
+top_param_KL = infant_splithalf_resnet50_KL %>% arrange(desc(mean_rsquared)) %>% first()
+resnet50_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
+
+top_param_surprisal = infant_splithalf_resnet50_surprisal %>% arrange(desc(mean_rsquared)) %>% first()
+resnet50_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
+
+top_param_nonoise = infant_splithalf_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% first()
+nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
+
+top_param_nolearning = infant_splithalf_resnet50_nolearning %>% arrange(desc(mean_rsquared)) %>% first()
+nolearning_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id)
+
+
+kfold_top_params = c(top_param_aligned$param_id, top_param_resnet50$param_id, top_param_KL$param_id,  top_param_surprisal$param_id, top_param_nonoise$param_id, top_param_nolearning$param_id)
+kfold_crossvalid_rsquared = c(top_param_aligned$mean_rsquared, top_param_resnet50$mean_rsquared, top_param_KL$mean_rsquared,  top_param_surprisal$mean_rsquared, top_param_nonoise$mean_rsquared, top_param_nolearning$mean_rsquared)
+kfold_crossvalid_rmse = c(top_param_aligned$mean_rmse, top_param_resnet50$mean_rmse, top_param_KL$mean_rmse,  top_param_surprisal$mean_rmse, top_param_nonoise$mean_rmse, top_param_nolearning$mean_rmse)
+kfold_overall_rsquared = c(aligned_overall_res[1], resnet50_overall_res[1], kl_overall_res[1], surprisal_overall_res[1], nonoise_overall_res[1], nolearning_overall_res[1])
+kfold_overall_rmse = c(aligned_overall_res[2], resnet50_overall_res[2], kl_overall_res[2], surprisal_overall_res[2], nonoise_overall_res[2], nolearning_overall_res[2])
 
 ```
 # extract relevant stats
 ```{r}
 
-# top crossvalidation stats
-cross_valid_corr_aligned = infant_kfold_aligned_eig %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
-cross_valid_corr_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
-cross_valid_corr_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% pull(mean_rsquared) %>% first()
-
-stats_df = tibble(sim_type = c('aligned','resnet50','nonoise'), 
-       crossvalidation_corr = c(cross_valid_corr_aligned, cross_valid_corr_resnet50, cross_valid_corr_nonoise), 
-       overall_corr = c(aligned_overall_corr, resnet50_overall_corr, nonoise_overall_corr), 
-       top_param = c(top_param_aligned,top_param_resnet50,top_param_nonoise))
+stats_df = tibble(sim_type = c('aligned','resnet50', 'kl', '','','nonoise'), 
+       subjectwise_rsquared = kfold_crossvalid_rsquared, 
+       splithalf_rsquared = splithalf_crossvalid_rsquared,
+       subjectwise_rmse = kfold_crossvalid_rsquared,
+       splithalf_rmse = splithalf_crossvalid_rmse,
+       kfold_overall_rsquared = kfold_overall_rsquared,
+       kfold_overall_rmse = kfold_overall_rmse,
+       splithalf_overall_rsquared = splithalf_overall_rsquared, 
+       splithalf_overall_rmse = splithalf_overall_rmse,
+       top_param_subjectwise = kfold_top_params,
+       top_param_splithalf = splithalf_top_params)
 
 ```
