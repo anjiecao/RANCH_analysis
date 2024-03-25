@@ -83,7 +83,6 @@ aligned_data = aligned_data %>% filter(!(trial_number == 1 & trial_type == 'devi
 resnet50_data = resnet50_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 KL_data = KL_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 surprisal_data = surprisal_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
-
 nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 
 ```
@@ -244,6 +243,8 @@ infant_splithalf_resnet50_nolearning <- lapply(
 ) %>% 
   bind_rows()
 
+infant_splithalf_resnet50_linmodel <- run_splithalf_linmodel(infant_data)
+
 saveRDS(infant_splithalf_aligned_eig, here("cached_data/infant_splithalf_aligned_eig.Rds"))
 saveRDS(infant_splithalf_resnet50_eig, here("cached_data/infant_splithalf_resnet50_eig.Rds"))
 saveRDS(infant_splithalf_resnet50_KL, here("cached_data/infant_splithalf_resnet50_KL.Rds"))
@@ -304,6 +305,8 @@ nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_para
 
 top_param_nolearning = infant_splithalf_resnet50_nolearning %>% arrange(desc(mean_rsquared)) %>% first()
 nolearning_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id)
+
+
 
 
 kfold_top_params = c(top_param_aligned$param_id, top_param_resnet50$param_id, top_param_KL$param_id,  top_param_surprisal$param_id, top_param_nonoise$param_id, top_param_nolearning$param_id)

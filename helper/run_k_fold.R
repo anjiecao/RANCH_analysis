@@ -260,3 +260,72 @@ run_splithalf_crossvalidation <- function(p_id, raw_d, sd){
   )
   
 }
+
+run_splithalf_linmodel <- function(raw_d) {
+  # get all the subjects 
+  all_sbj <- unique(raw_d$subj_id)
+  n_folds = 2
+  
+  # currently testing on one set of parameter 
+  rsquared <- vector(mode = "list", length = n_folds)
+  rmse <- vector(mode = "list", length = n_folds)
+  
+  # random indices
+  ind <- sample(c(TRUE, FALSE), length(all_sbj), replace=TRUE, prob=c(0.5, 0.5))
+  
+  # create two equal sets
+  set1 = all_sbj[ind]
+  set2 = all_sbj[!ind]
+  
+  for (k in 1:n_folds){
+    
+    # separate the data in to train & test
+    if (k==1) {
+      train_subject = set1
+    }
+    else {
+      train_subject = set2
+    }
+    
+    train_data = summarize_behavioral_data_infants(raw_d %>% filter(subj_id %in% train_subject)) 
+    test_data = summarize_behavioral_data_infants(raw_d %>% filter(!subj_id %in% train_subject))  
+    
+    
+    # fit linear model
+    linear_model = tidy(lm(LT ~ fam_duration * test_type - test_type, data = train_data))
+    
+    intercept_linmodel = linear_model$estimate[1]
+    fam_duration_linmodel = linear_model$estimate[2]
+    interaction_linmodel = linear_model$estimate[3]
+    
+    test_set = test_data %>%
+      mutate(samples_linear_model = intercept_linmodel + fam_duration_linmodel * fam_duration + interaction_linmodel * ifelse(test_type == 'nov', 1, 0) * fam_duration)
+    
+    # save results for each fold 
+    rsquared[[k]] <- cor(test_scaled$mean_lt, test_scaled$samples_linear_model)^2
+    rmse[[k]] <- rmse(test_scaled$mean_lt, test_scaled$samples_linear_model)
+    
+  }
+  
+  rsquared_average <- mean(unlist(rsquared))
+  rmse_average <- mean(unlist(rmse))
+  rsquared_sd = sd(unlist(rsquared))
+  rmse_sd <- sd(unlist(rmse))
+  
+  
+  return(
+    tibble(
+      "param_id" = p_id, 
+      "mean_rsquared" = rsquared_average, 
+      "mean_rmse" = rmse_average, 
+      "ub_rsquared" = rsquared_average + 1.96 * (rsquared_sd / sqrt(n_folds)), 
+      "lb_rsquared" = rsquared_average - 1.96 * (rsquared_sd / sqrt(n_folds)), 
+      "ub_rmse" = rmse_average + 1.96 * (rmse_sd / sqrt(n_folds)), 
+      "lb_rmse" = rmse_average - 1.96 * (rmse_sd / sqrt(n_folds))
+      
+    )
+  )
+    
+  }
+  
+
