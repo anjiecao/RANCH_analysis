@@ -74,7 +74,7 @@ infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% fi
 aligned_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
 resnet50_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv')) 
 KL_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_KL.csv'))
-surprisal_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv'))
+surprisal_data = read_csv(here('simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv'))
 nonoise_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv'))
 
 
@@ -90,8 +90,8 @@ nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'devi
 # Sanity check
 ```{r}
 
-nonoise_data  %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
- stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
+surprisal_data %>% filter(param_id == 198) %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled') + facet_grid(~param_id)
 
 
 ```
@@ -270,10 +270,10 @@ top_param_resnet50 = infant_kfold_resnet50_eig %>% arrange(desc(mean_rsquared)) 
 resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
 
 top_param_KL = infant_kfold_resnet50_KL %>% arrange(desc(mean_rsquared)) %>% first()
-resnet50_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
+KL_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
 
 top_param_surprisal = infant_kfold_resnet50_surprisal %>% arrange(desc(mean_rsquared)) %>% first()
-resnet50_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
+surprisal_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
 
 top_param_nonoise = infant_kfold_resnet50_nonoise %>% arrange(desc(mean_rsquared))  %>% first()
 nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
@@ -295,10 +295,10 @@ top_param_resnet50 = infant_splithalf_resnet50_eig %>% arrange(desc(mean_rsquare
 resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
 
 top_param_KL = infant_splithalf_resnet50_KL %>% arrange(desc(mean_rsquared)) %>% first()
-resnet50_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
+KL_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
 
 top_param_surprisal = infant_splithalf_resnet50_surprisal %>% arrange(desc(mean_rsquared)) %>% first()
-resnet50_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
+surprisal_overall_res = viz_top_param(surprisal_data, grouped_infant_means, top_param_surprisal$param_id)
 
 top_param_nonoise = infant_splithalf_resnet50_nonoise %>% arrange(desc(mean_rsquared)) %>% first()
 nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
