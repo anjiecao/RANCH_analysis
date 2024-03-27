@@ -34,11 +34,57 @@ split_vector_into_chunks <- function(vec){
   return(chunks)
 }
 
+run_all_full_data_fit <- function(sim_data, behavioral_data){
+  
+  full_data_fit_res <- lapply(
+    unique(sim_data$param_id), 
+    function(id){
+      run_full_data_fit(p_id = id, 
+                 raw_d = behavioral_data, 
+                 sd = sim_data)
+    }
+  ) %>% 
+    bind_rows()
+  
+  return (full_data_fit_res)
+  
+}
+
+
+run_full_data_fit <- function(p_id, raw_d, sd){
+  
+  data_to_fit <- summarize_behavioral_data(raw_d) %>% 
+    ungroup() %>% 
+    left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) 
+  
+  fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = data_to_fit, lower = c(-Inf, 0.0000001))
+  sample_slope = fitted_stats$coefficients["param_mean_sample"]
+  sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+  
+  scaled_data <- data_to_fit %>% 
+    mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
+  
+  rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
+  rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
+ 
+  
+  return(
+    tibble(
+      "param_id" = p_id, 
+      "mean_rsquared" = rsquared, 
+      "mean_rmse" = rmse
+    )
+  )
+  
+}
+
 run_k_fold <- function(p_id, raw_d, sd){
   
   # get all the subjects 
   all_sbj <- unique(raw_d$prolific_id)
+  all_sbj <- sample(all_sbj)
   n_folds = 10
+  
   
   folds = split_vector_into_chunks(all_sbj)
 
