@@ -1,0 +1,139 @@
+```{r}
+library(tidyverse)
+library(here)
+library(colf)
+library(ggthemes)
+library(Metrics)
+source(here("helper/run_k_fold.R"))
+
+adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
+infant_bd <- read_csv(here("infants/data/infant_exposure_duration.csv"))%>% filter(fam_or_test == 'test', !exclude)
+
+adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+infant_resnet50_eig <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+```
+
+```{r}
+renaming <- function(df) {
+  df <- df %>%
+  group_by(param_id, trial_type) %>%
+  filter(all(2:10 %in% trial_number)) %>% # only keep parameters for which all fam durations have been computed
+  ungroup() %>%
+  rename(test_type = trial_type) %>%
+  mutate(fam_duration = trial_number - 1,
+         test_type = case_when(test_type == 'background' ~ 'fam', test_type == 'deviant' ~ 'nov')) 
+  return(df)
+}
+
+infant_resnet50_eig <- infant_resnet50_eig %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+```
+
+
+```{r}
+p_id = 1
+
+
+run_joint_fit <- function(adult_d, infant_d, adult_sim, infant_sim, p_id){
+  
+
+
+adult_data_to_fit <- summarize_behavioral_data(adult_bd) %>% 
+    ungroup() %>% 
+    left_join(adult_resnet50_eig %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) 
+
+infant_data_to_fit <- summarize_behavioral_data_infants(infant_bd) %>% 
+  ungroup() %>% 
+  left_join(infant_resnet50_eig %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
+
+joint_scale_dataset <- adult_data_to_fit %>% 
+  mutate(type = "adults") %>% 
+  #select(type, mean_lt, mean_sample) %>% 
+  mutate(mean_lt = mean_lt / 1000) %>% 
+  bind_rows(
+    infant_data_to_fit %>% 
+      mutate(type = "infants")  
+      #select(type, mean_lt, mean_sample)
+  ) 
+
+fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = joint_scale_dataset, lower = c(-Inf, 0.0000001))
+sample_slope = fitted_stats$coefficients["param_mean_sample"]
+sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+    
+scaled_data <- joint_scale_dataset %>% 
+  mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
+
+#calculate the r
+
+adult_scaled <- scaled_data %>% filter(type == "adults")
+adult_rsquared <- cor(adult_scaled$mean_lt, adult_scaled$scaled_samples)^2
+adult_rmse <- rmse(adult_scaled$mean_lt, adult_scaled$scaled_samples)
+
+infant_scaled <- scaled_data %>% filter(type == "infants")
+infant_rsquared <- cor(infant_scaled$mean_lt, infant_scaled$scaled_samples)^2
+infant_rmse <- rmse(infant_scaled$mean_lt, infant_scaled$scaled_samples)
+
+res = tibble(
+      "param_id" = p_id, 
+      "adult_rsquared" = adult_rsquared,
+      "adult_rmse" = adult_rmse,
+      "infant_rsquared" = infant_rsquared, 
+      "infant_rmse" = infant_rmse
+
+    )
+
+return(res)
+}
+
+
+  
+run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_eig, infant_sim = infant_resnet50_eig, p_id = 2)
+```
+
+
+```{r}
+full_joint_search <- lapply(
+    unique(adult_resnet50_eig$param_id), 
+    function(id){
+      run_joint_fit(adult_d = adult_bd, 
+                    infant_d = infant_bd, 
+                    adult_sim = adult_resnet50_eig, 
+                    infant_sim = infant_resnet50_eig, p_id = id)
+    }
+  ) %>% 
+    bind_rows()
+```
+
+```{r}
+full_joint_search %>% arrange(-adult_rsquared) #159  
+full_joint_search %>% arrange(-infant_rsquared) #31
+
+full_joint_search %>% arrange(-adult_rmse) #5
+full_joint_search %>% arrange(-infant_rmse) #23
+
+```
+
+```{r}
+param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_eig.csv"))
+param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
+  filter(param_id == 159 | param_id == 31) %>% 
+  mutate(param_id = if_else(param_id == 159, "adults", "infants"))
+
+param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
+  filter(param_id == 5 | param_id == 23) %>% 
+  mutate(param_id = if_else(param_id == 159, "adults", "infants"))
+```
+
+
+```{r}
+adult_scaled <- scaled_data %>% 
+  filter(type == "adults") %>% 
+  ggplot(aes(x = trial_number, y = scaled_samples, color = trial_type)) + 
+  geom_point()
+
+scaled_data %>% 
+  filter(type == "infants") %>% 
+  ggplot(aes(x = fam_duration, y = scaled_samples, color = test_type)) + 
+  geom_point()
+
+```
+
