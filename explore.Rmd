@@ -14,7 +14,7 @@ adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_
 adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
 adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
 adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
-#adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
+adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
 
 ```
 
@@ -25,7 +25,7 @@ adult_kfold_resnet50_eig = run_all_kfold(sim_data = adult_resnet50_eig, behavior
 adult_kfold_resnet50_nonoise = run_all_kfold(sim_data = adult_resnet50_nonoise, behavioral_data = adult_bd)
 adult_kfold_resnet50_nolearning = run_all_kfold(sim_data = adult_resnet50_nolearning, behavioral_data = adult_bd)
 adult_kfold_resnet50_kl = run_all_kfold(sim_data = adult_resnet50_kl, behavioral_data = adult_bd)
-#adult_kfold_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
 
 
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
@@ -33,7 +33,7 @@ saveRDS(adult_kfold_resnet50_eig, here("cached_data/adult_kfold_resnet50_eig.Rds
 saveRDS(adult_kfold_resnet50_nonoise, here("cached_data/adult_kfold_resnet50_nonoise.Rds"))
 saveRDS(adult_kfold_resnet50_nolearning, here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
 saveRDS(adult_kfold_resnet50_kl, here("cached_data/adult_kfold_resnet50_kl.Rds"))
-#saveRDS(adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
+saveRDS(adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
 ```
 
 

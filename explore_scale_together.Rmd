@@ -120,7 +120,7 @@ param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, wo
 
 param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
   filter(param_id == 5 | param_id == 23) %>% 
-  mutate(param_id = if_else(param_id == 159, "adults", "infants"))
+  mutate(param_id = if_else(param_id == 5, "adults", "infants"))
 ```
 
 
