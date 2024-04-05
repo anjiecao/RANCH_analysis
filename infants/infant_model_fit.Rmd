@@ -76,6 +76,11 @@ resnet50_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linke
 KL_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_KL.csv'))
 surprisal_data = read_csv(here('simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv'))
 nonoise_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv'))
+nolearning_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv'))
+
+# check data integrity
+aligned_data %>% group_by(param_id) %>% count() %>% pull(n) %>% unique()
+surprisal_data %>% group_by(param_id) %>% count() %>% pull(n) 
 
 
 # remove the trial 0 of novel and some renaming
@@ -84,14 +89,21 @@ resnet50_data = resnet50_data %>% filter(!(trial_number == 1 & trial_type == 'de
 KL_data = KL_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 surprisal_data = surprisal_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+nolearning_data = nolearning_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 
 ```
 
 # Sanity check
 ```{r}
 
-surprisal_data %>% ggplot(aes(x = trial_number, y = mean_sample, color = test_type)) +
- stat_summary() 
+infant_data_unlinked = read_csv(here('simulations/sim_infant_exposure_duration/00_raw_sim/actual_sims/summarized_output_infants_surprisal_resnet50_longerforced.csv'))
+
+linked_aligned_eig <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, 
+                                    sim_data = infant_data_unlinked)
+
+infant_data_unlinked %>% filter(param_id !=22, index < 9) %>% mutate(index = index + 1, forced_exposure_duration = case_when(param_id == 9 ~ 5, param_id == 65 ~ 25, param_id == 108 ~ 50)) %>% mutate(trial_type = ifelse(trial_id %% 2 == 0, 'background', 'deviant')) %>% filter(!is.na(index)) %>% ggplot(aes(x = index, y = sample_n_mean, color = trial_type)) + stat_summary() + facet_wrap(~forced_exposure_duration) + theme_classic(25) + ylab('model samples') + xlab('trial number') + scale_x_continuous(breaks = c(1,3,6,9))
+
 
 
 ```
@@ -159,6 +171,16 @@ infant_kfold_resnet50_nonoise <- lapply(
 ) %>% 
   bind_rows()
 
+# resnet 50 nolearning
+infant_kfold_resnet50_nolearning <- lapply(
+  unique(nolearning_data$param_id), 
+  function(id){
+    run_subject_wise_crossvalidation(p_id = id, 
+               raw_d = infant_data, 
+               sd = nolearning_data)
+  }
+) %>% 
+  bind_rows()
 
 saveRDS(infant_kfold_aligned_eig, here("cached_data/infant_kfold_aligned_eig.Rds"))
 saveRDS(infant_kfold_resnet50_eig, here("cached_data/infant_kfold_resnet50_eig.Rds"))
@@ -234,11 +256,11 @@ infant_splithalf_resnet50_nonoise <- lapply(
 
 # resnet 50 nolearning
 infant_splithalf_resnet50_nolearning <- lapply(
-  unique(nonoise_data$param_id), 
+  unique(nolearning_data$param_id), 
   function(id){
     run_splithalf_crossvalidation(p_id = id, 
                raw_d = infant_data, 
-               sd = nonoise_data)
+               sd = nolearning_data)
   }
 ) %>% 
   bind_rows()
