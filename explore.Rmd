@@ -15,6 +15,7 @@ adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration
 adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
 adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
 adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
+adult_resnet50_surprisal_missing <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing.csv"))
 
 ```
 
@@ -25,7 +26,15 @@ adult_kfold_resnet50_eig = run_all_kfold(sim_data = adult_resnet50_eig, behavior
 adult_kfold_resnet50_nonoise = run_all_kfold(sim_data = adult_resnet50_nonoise, behavioral_data = adult_bd)
 adult_kfold_resnet50_nolearning = run_all_kfold(sim_data = adult_resnet50_nolearning, behavioral_data = adult_bd)
 adult_kfold_resnet50_kl = run_all_kfold(sim_data = adult_resnet50_kl, behavioral_data = adult_bd)
+# first surprisal has some missing parameters, so ran twice
 adult_kfold_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal_missing = run_all_kfold(sim_data = adult_resnet50_surprisal_missing, behavioral_data = adult_bd)
+first_pass_surprisal <- adult_kfold_resnet50_surprisal %>% 
+  filter(!is.na(mean_rsquared))
+second_pass_surprisal <- adult_kfold_resnet50_surprisal_missing %>% 
+  filter(!is.na(mean_rsquared))
+adult_kfold_resnet50_surprisal <- bind_rows(first_pass_surprisal, second_pass_surprisal) 
+
 
 
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
@@ -34,7 +43,10 @@ saveRDS(adult_kfold_resnet50_nonoise, here("cached_data/adult_kfold_resnet50_non
 saveRDS(adult_kfold_resnet50_nolearning, here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
 saveRDS(adult_kfold_resnet50_kl, here("cached_data/adult_kfold_resnet50_kl.Rds"))
 saveRDS(adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
+
 ```
+
+
 
 
 ```{r}
@@ -44,11 +56,47 @@ adult_fulldata_resnet50_nonoise = run_all_full_data_fit(sim_data = adult_resnet5
 adult_fulldata_resnet50_nolearning = run_all_full_data_fit(sim_data = adult_resnet50_nolearning, behavioral_data = adult_bd)
 adult_fulldata_resnet50_kl = run_all_full_data_fit(sim_data = adult_resnet50_kl, behavioral_data = adult_bd)
 
+adult_fulldata_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
+adult_fulldata_resnet50_surprisal_missing = run_all_kfold(sim_data = adult_resnet50_surprisal_missing, behavioral_data = adult_bd)
+first_pass_surprisal <- adult_fulldata_resnet50_surprisal %>% 
+  filter(!is.na(mean_rsquared))
+second_pass_surprisal <- adult_fulldata_resnet50_surprisal_missing %>% 
+  filter(!is.na(mean_rsquared))
+adult_fulldata_resnet50_surprisal <- bind_rows(first_pass_surprisal, second_pass_surprisal) 
+
 saveRDS(adult_fulldata_aligned_eig, here("cached_data/adult_fulldata_aligned_eig.Rds"))
 saveRDS(adult_fulldata_resnet50_eig, here("cached_data/adult_fulldata_resnet50_eig.Rds"))
 saveRDS(adult_fulldata_resnet50_nonoise, here("cached_data/adult_fulldata_resnet50_nonoise.Rds"))
 saveRDS(adult_fulldata_resnet50_nolearning, here("cached_data/adult_fulldata_resnet50_nolearning.Rds"))
 saveRDS(adult_fulldata_resnet50_kl, here("cached_data/adult_fulldata_resnet50_kl.Rds"))
+saveRDS(adult_fulldata_resnet50_surprisal,  here("cached_data/adult_fulldata_resnet50_surprisal.Rds"))
+```
+
+
+```{r}
+suprirsal_fit <- readRDS(here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
+
+worst_ten_df <- suprirsal_fit %>% 
+  arrange(mean_rsquared) %>% 
+  head(10) %>% 
+  pull(param_id)
+
+best_ten_df <- suprirsal_fit %>% 
+  arrange(-mean_rsquared) %>% 
+  head(10) %>% 
+  pull(param_id)
+
+param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_surprisal.csv")) %>% 
+  select(param_id, mu_prior, V_prior, alpha_prior, beta_prior, epsilon, mu_epsilon, sd_epsilon, world_EIGs)
+
+worst_param_id <- param_info %>% 
+  filter(param_id %in% worst_ten_df)
+
+best_param_id <- param_info %>% 
+  filter(param_id %in% best_ten_df)
+
+worst_param_id
+best_param_id
 ```
 
 
@@ -83,6 +131,7 @@ adult_fulldata_aligned_eig %>% mutate(type = "aligned-eig") %>%
 
 
 
+
 ```{r}
 adult_kfold_aligned_eig <- readRDS(here("cached_data/adult_kfold_aligned_eig.Rds"))
 adult_kfold_aligned_eig %>% 
@@ -102,7 +151,7 @@ adult_resnet50_nolearning %>%
 
 ```{r}
 
-adult_kfold_resnet50_surprisal %>% 
+two_passes_surprisal %>% 
   ggplot(aes(x = mean_rsquared)) + 
   geom_histogram() 
 
