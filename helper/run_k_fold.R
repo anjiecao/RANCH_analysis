@@ -307,6 +307,30 @@ run_splithalf_crossvalidation <- function(p_id, raw_d, sd){
   
 }
 
+repeat_splithalf <- function(model_data, infant_data, n){
+  
+  splithalf_df = list()
+  
+  # aligned EIG
+  for (x in 1:n){
+    splithalf_df[[x]] <- lapply(
+      unique(model_data$param_id), 
+      function(id){
+        run_splithalf_crossvalidation(p_id = id, 
+                                      raw_d = infant_data, 
+                                      sd = model_data)
+      }
+    ) %>% 
+      bind_rows()
+
+  }
+  
+  splithalf_df = splithalf_df %>% bind_rows()
+  
+  return(splithalf_df)
+}
+  
+
 run_splithalf_linmodel <- function(raw_d) {
   # get all the subjects 
   all_sbj <- unique(raw_d$subj_id)
