@@ -4,6 +4,8 @@ library(tidyverse)
 library(here)
 library(colf)
 library(ggthemes)
+library(lme4)
+library(lmerTest)
 library(Metrics)
 source(here("helper/run_k_fold.R"))
 
@@ -73,126 +75,136 @@ saveRDS(adult_fulldata_resnet50_surprisal,  here("cached_data/adult_fulldata_res
 ```
 
 
-```{r}
-suprirsal_fit <- readRDS(here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
 
-worst_ten_df <- suprirsal_fit %>% 
-  arrange(mean_rsquared) %>% 
-  head(10) %>% 
-  pull(param_id)
+# Try plotting 
 
-best_ten_df <- suprirsal_fit %>% 
-  arrange(-mean_rsquared) %>% 
-  head(10) %>% 
-  pull(param_id)
-
-param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_surprisal.csv")) %>% 
-  select(param_id, mu_prior, V_prior, alpha_prior, beta_prior, epsilon, mu_epsilon, sd_epsilon, world_EIGs)
-
-worst_param_id <- param_info %>% 
-  filter(param_id %in% worst_ten_df)
-
-best_param_id <- param_info %>% 
-  filter(param_id %in% best_ten_df)
-
-worst_param_id
-best_param_id
-```
-
-
-
-# Plotting 
-
-```{r}
-adult_kfold_aligned_eig %>% mutate(type = "aligned-eig") %>% 
-  bind_rows(
-    adult_kfold_resnet50_eig %>% mutate(type = "resnet50-eig"), 
-    adult_kfold_resnet50_nonoise %>% mutate(type = "no noise"), 
-    adult_kfold_resnet50_nolearning%>% mutate(type = "no learning"), 
-    adult_kfold_resnet50_kl %>% mutate(type = "resnet50-kl")
-  ) %>% 
-  ggplot(aes(x = type, y = mean_rsquared, alpha = .1)) +
-  geom_point(position = position_jitter(width = .1)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2), color = "red")+ 
-  ylim(0, 1)
-
-adult_fulldata_aligned_eig %>% mutate(type = "aligned-eig") %>% 
-  bind_rows(
-    adult_fulldata_resnet50_eig %>% mutate(type = "resnet50-eig"), 
-    adult_fulldata_resnet50_nonoise %>% mutate(type = "no noise"), 
-    adult_fulldata_resnet50_nolearning%>% mutate(type = "no learning"), 
-    adult_fulldata_resnet50_kl %>% mutate(type = "resnet50-kl")
-  ) %>% 
-  ggplot(aes(x = type, y = mean_rsquared, alpha = .1)) +
-  geom_point(position = position_jitter(width = .1)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2), color = "red")+ 
-  ylim(0, 1)
-```
-
-
-
-
-```{r}
-adult_kfold_aligned_eig <- readRDS(here("cached_data/adult_kfold_aligned_eig.Rds"))
-adult_kfold_aligned_eig %>% 
-  arrange(-mean_rsquared)
-
-
-adult_resnet50_nolearning %>% 
-  filter(param_id == 53) %>% 
-  mutate(trial_type = if_else(trial_number == 1 & trial_type == "deviant", "background", trial_type)) %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
-  geom_pointrange(aes(ymin = lb_sample, ymax = ub_sample)) +
-  geom_line()+
-  theme_few() 
-```
-
-
+## get the behavioral plots 
 
 ```{r}
 
-two_passes_surprisal %>% 
-  ggplot(aes(x = mean_rsquared)) + 
-  geom_histogram() 
-
-aligned_eig %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
-  theme_few() 
+model_d <- adult_bd %>% 
+  mutate(is_first_trial = (trial_number == 1)) %>% 
+  mutate(block_id = block_id + 1)
 
 
- 
-adult_bd %>% 
-  #filter(trial_number != 11) %>% 
-   ggplot(aes(x = trial_number, y = total_rt, color = trial_type)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
-  theme_few() 
+model <- lmer(log(total_rt) ~ trial_number + is_first_trial + trial_number * trial_type + log(block_id) + (1 | prolific_id) , data = model_d)
+
+new_data <- adult_bd %>% 
+  mutate(is_first_trial = trial_number == 1) %>% 
+  mutate(block_id = block_id + 1) %>%
+  distinct(trial_number, is_first_trial, trial_type, block_id) %>% 
+  mutate(prolific_id = 1)
+
+new_data$pred = stats::predict(model, re.form = NA, newdata = new_data) 
+
+new_data <- new_data %>% 
+ ungroup() %>% 
+  group_by(trial_type, trial_number) %>% 
+  tidyboot::tidyboot_mean(pred, na.rm=T) %>% 
+  mutate(pred = empirical_stat, 
+        pred_lb = ci_lower, 
+         pred_ub = ci_upper)
 
 
-aligned_eig %>% 
-  filter(param_id == 93) %>% 
-  ggplot(aes(x = fam_duration, y = mean_sample, color = trial_type)) + 
-  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2)) + 
-  theme_few()
-```
-
-
-```{r}
-eig_summarized
-```
-
-
-```{r}
-d %>% 
-  distinct(trial_id, param_id, sample_n_mean, sample_n_std, fam_duration, test_type)
-
+bp <- adult_bd %>% 
+  ggplot(aes(x = trial_number, y = log(total_rt), color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  #geom_ribbon(data = new_data, aes(x = trial_number, y = pred, ymin = pred_lb, ymax = pred_ub, fill = trial_type, group = trial_type, alpha = .1), colour = NA) + 
+  geom_line(data = new_data, aes(x = trial_number, y = pred, color = trial_type, group = trial_type)) + 
+  theme_few()  + 
+  theme(legend.position = "none") + 
+  ylab("Log-transformed looking time") + 
+  xlab("Trial Number")
 
 ```
 
+## collect the best fitting plots
+
+
 ```{r}
-adult_resnet_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
+adult_kfold_resnet50_eig <- readRDS(here("cached_data/adult_kfold_resnet50_eig.Rds"))
+adult_kfold_resnet50_nonoise <- readRDS(here("cached_data/adult_kfold_resnet50_nonoise.Rds"))
+adult_kfold_resnet50_nolearning <- readRDS(here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
+adult_kfold_resnet50_kl <- readRDS( here("cached_data/adult_kfold_resnet50_kl.Rds"))
+adult_kfold_resnet50_surprisal <- readRDS(here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
 
-ggplot(adult_resnet_nonoise, aes(x = trial_number, y = mean_sample, color = trial_type)) + stat_summary(fun.data = "mean_cl_boot")
+adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
+adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
+adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
 
+adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
+adult_resnet50_surprisal_missing <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing.csv"))
+
+# the surprisal needs some further processing 
+first_surprisal_complete <- adult_resnet50_surprisal %>% group_by(param_id) %>% count() %>% filter(n == 22) %>% pull(param_id)
+second_surprisal_compelte <- adult_resnet50_surprisal_missing %>% group_by(param_id) %>% count() %>% filter(n == 22) %>% pull(param_id)
+first_surprisal <- adult_resnet50_surprisal %>% filter(param_id %in% first_surprisal_complete)
+second_surprisal <- adult_resnet50_surprisal_missing %>% filter(param_id %in% second_surprisal_compelte)
+adult_resnet50_surprisal <- bind_rows(first_surprisal, second_surprisal)
+
+
+get_best_fit_data <- function(kfold_results, all_fit, behavioral_d, metrics){
+  
+  # get the best fitting parameters
+  if (metrics == "rmse"){
+    best_fit_param <- kfold_results %>% 
+      arrange(mean_rmse) %>% 
+      head(1) %>% 
+      pull(param_id)
+  }else if(metrics == "rsquared"){
+    best_fit_param <- kfold_results %>% 
+      arrange(-mean_rsquared) %>% 
+      head(1) %>% 
+      pull(param_id)
+  }
+  best_fit <- all_fit %>% filter(param_id == best_fit_param)
+  
+  # clean the behavioral data to prepare fitting 
+  behavioral_d <- summarize_behavioral_data(behavioral_d) %>% ungroup() %>% 
+    left_join(best_fit %>% ungroup(), by = c("trial_number", "trial_type")) 
+  fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = behavioral_d, lower = c(-Inf, 0.0000001))
+  sample_slope = fitted_stats$coefficients["param_mean_sample"]
+  sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+  
+  scaled_data <- best_fit %>% 
+    mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept, 
+           scaled_ub_sample = ub_sample * sample_slope  + sample_intercept, 
+           scaled_lb_sample = lb_sample * sample_slope + sample_intercept)
+  
+  
+  return(scaled_data)
+}
+
+best_fit_eig <- get_best_fit_data(adult_kfold_resnet50_eig, adult_resnet50_eig, adult_bd, "rsquared") %>% mutate(type = "EIG")
+best_fit_kl <-  get_best_fit_data(adult_kfold_resnet50_kl, adult_resnet50_kl, adult_bd, "rsquared") %>% mutate(type = "KL")
+best_fit_suprisal <- get_best_fit_data(adult_kfold_resnet50_surprisal, adult_resnet50_surprisal, adult_bd, "rsquared") %>% mutate(type = "Surprisal")
+best_fit_nonoise <- get_best_fit_data(adult_kfold_resnet50_nonoise, adult_resnet50_nonoise, adult_bd, "rsquared") %>% mutate(type = "No Noise")
+best_fit_nolearning <- get_best_fit_data(adult_kfold_resnet50_nolearning, adult_resnet50_nolearning, adult_bd, "rsquared") %>% mutate(type = "No Learning")
+
+
+sim_plot <- bind_rows(best_fit_eig, best_fit_kl, best_fit_suprisal, best_fit_nonoise, best_fit_nolearning) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "Background", "Deviant")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot(aes(x = trial_number, y = log(scaled_samples), color = trial_type)) + 
+  geom_point() + 
+  geom_line(aes(group = trial_type)) + 
+  theme_few() +
+  geom_pointrange(aes(ymin = log(scaled_lb_sample), ymax = log(scaled_ub_sample))) + 
+  facet_wrap(~type, scales = "free_y") + 
+  theme(
+  legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+  legend.background = element_rect(fill = "white", colour = NA) 
+) + 
+  ylab("") + 
+  xlab("") + 
+  guides(color=guide_legend(title="Trial Type"))
+```
+
+## put things together? 
+
+```{r}
+library(cowplot)
+plot_grid(bp, sim_plot, rel_widths = c(1, 3))
 ```
 
