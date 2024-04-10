@@ -15,7 +15,9 @@ viz_top_param <- function(sim_data, infant_data, top_param) {
   combined_df <- combined_df %>%
     left_join(grouped_stats, by = c("param_id")) %>% 
     dplyr::rename(intercept = "(Intercept)", slope = mean_sample.y, n_samples = mean_sample.x) %>% 
-    mutate(scaled_samples = n_samples * slope + intercept) %>% select(-n_samples)
+    mutate(scaled_samples = n_samples * slope + intercept,
+           scaled_ub_sample = ub_sample * slope  + intercept, 
+           scaled_lb_sample = lb_sample * slope + intercept) %>% select(-n_samples)
   
   top_sim_result = combined_df %>% filter(param_id == top_param) 
   
@@ -28,7 +30,7 @@ viz_top_param <- function(sim_data, infant_data, top_param) {
   
   print(plot)
   
-  return(plot_df)
+  return(plot_df %>% filter(value_type == 'RANCH (infants)'))
 }
 
 renaming <- function(df) {
@@ -39,5 +41,13 @@ renaming <- function(df) {
     rename(test_type = trial_type) %>%
     mutate(fam_duration = trial_number - 1,
            test_type = case_when(test_type == 'background' ~ 'fam', test_type == 'deviant' ~ 'nov')) 
+  return(df)
+}
+
+get_param_stats <- function(df){
+  df = df %>% group_by(param_id) %>% 
+    summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse), 
+              r2_lb = quantile(mean_rsquared, 0.025), r2_ub = quantile(mean_rsquared, 0.975),
+              rmse_lb = quantile(mean_rmse, 0.025), rmse_ub = quantile(mean_rmse, 0.975))
   return(df)
 }

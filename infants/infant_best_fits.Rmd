@@ -15,13 +15,13 @@ source(here("helper/viz_fits.R"))
 ```{r}
 
 # crossvalidation DF's
-aligned_EIG_CV = readRDS(here("cached_data/infant_splithalf_aligned_eig.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_EIG_CV = readRDS(here("cached_data/infant_splithalf_resnet50_eig.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_KL_CV = readRDS(here("cached_data/infant_splithalf_resnet50_KL.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_surprisal_short_CV = readRDS(here("cached_data/infant_splithalf_resnet50_surprisal_short.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_surprisal_long_CV = readRDS(here("cached_data/infant_splithalf_resnet50_surprisal_long.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_nonoise_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nonoise.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
-resnet50_nolearning_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nolearning.Rds")) %>% group_by(param_id) %>% summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse))
+aligned_EIG_CV = readRDS(here("cached_data/infant_splithalf_aligned_eig.Rds")) %>% get_param_stats()
+resnet50_EIG_CV = readRDS(here("cached_data/infant_splithalf_resnet50_eig.Rds")) %>% get_param_stats()
+resnet50_KL_CV = readRDS(here("cached_data/infant_splithalf_resnet50_KL.Rds")) %>% get_param_stats()
+resnet50_surprisal_short_CV = readRDS(here("cached_data/infant_splithalf_resnet50_surprisal_short.Rds")) %>% get_param_stats()
+resnet50_surprisal_long_CV = readRDS(here("cached_data/infant_splithalf_resnet50_surprisal_long.Rds")) %>% get_param_stats()
+resnet50_nonoise_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nonoise.Rds")) %>% get_param_stats()
+resnet50_nolearning_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nolearning.Rds")) %>% get_param_stats()
 linmodel_df = readRDS(here("cached_data/infant_splithalf_linmodel.Rds")) 
 
 # simulation df's
@@ -43,7 +43,6 @@ nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'devi
 nolearning_data = nolearning_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 
 
-
 # infant behavioral data
 infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% filter(fam_or_test == 'test', !exclude)
 infant_data = infant_data %>% mutate(subj_id = paste0(experiment, subject_num))
@@ -57,51 +56,80 @@ grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dpl
 
 ```{r}
 top_param_aligned = aligned_EIG_CV  %>% arrange(desc(r2)) %>% first()
-aligned_overall_res = viz_top_param(aligned_data, grouped_infant_means, top_param_aligned$param_id)
+aligned_overall_res = viz_top_param(aligned_data, grouped_infant_means, top_param_aligned$param_id) %>% mutate(value_type = 'aligned')
 
 top_param_resnet50 = resnet50_EIG_CV %>% arrange(desc(r2)) %>% first()
-resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
+resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id) %>% mutate(value_type = 'EIG')
 
 top_param_KL = resnet50_KL_CV %>% arrange(desc(r2)) %>% first()
-KL_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
+KL_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id) %>% mutate(value_type = 'KL')
 
 top_param_surprisal_short = resnet50_surprisal_short_CV %>% arrange(desc(r2)) %>% first()
-surprisal_short_overall_res = viz_top_param(surprisal_data_short, grouped_infant_means, top_param_surprisal_short$param_id)
+surprisal_short_overall_res = viz_top_param(surprisal_data_short, grouped_infant_means, top_param_surprisal_short$param_id) %>% mutate(value_type = 'surprisal_short')
 
 top_param_surprisal_long = resnet50_surprisal_long_CV %>% arrange(desc(r2)) %>% first()
-surprisal_long_overall_res = viz_top_param(surprisal_data_long, grouped_infant_means, top_param_surprisal_long$param_id)
+surprisal_long_overall_res = viz_top_param(surprisal_data_long, grouped_infant_means, top_param_surprisal_long$param_id) %>% mutate(value_type = 'surprisal_long')
 
 top_param_nonoise = resnet50_nonoise_CV %>% arrange(desc(r2)) %>% first()
-nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
+nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id) %>% mutate(value_type = 'nonoise')
 
 top_param_nolearning = resnet50_nolearning_CV %>% arrange(desc(r2)) %>% first()
-nonoise_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id)
-
+nolearning_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id) %>% mutate(value_type = 'nolearning')
 
 ```
 
+Plot
+```{r}
+
+sim_plot <- bind_rows(resnet50_overall_res,KL_overall_res, surprisal_short_overall_res, nonoise_overall_res, nolearning_overall_res) %>%
+  mutate(trial_type = if_else(test_type == "background", "Background", "Deviant"),
+         scaled_samples = value) %>%
+  ggplot(aes(x = trial_number, y = scaled_samples, color = test_type, group = test_type)) + 
+  geom_point() + 
+  geom_line() + 
+  geom_pointrange(aes(ymin = scaled_lb_sample, ymax = scaled_ub_sample)) +
+  theme_few()  + 
+  facet_wrap(~value_type, scales = "free_y") + 
+  theme(
+  legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+  legend.background = element_rect(fill = "white", colour = NA) 
+) + 
+  ylab("") + 
+  xlab("") + 
+  guides(color=guide_legend(title="Trial Type")) + ggtitle("R2 best fits")
+
+behavior_plot <- infant_data %>% ggplot(aes(x=as.numeric(fam_duration), y=LT, group=test_type, color = test_type)) + geom_point(alpha=0.1, size = 2, position = position_jitterdodge(jitter.width = 0.15)) + geom_smooth(method ="lm", alpha = 0.4) + stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", position = position_dodge(width = 1), size = 1) + xlab('Prior exposures') + ylab('Looking time (s)') + labs(color = 'Test type') + theme_few(base_size = 25) + 
+  theme(strip.text.x = element_text(size = 20, colour = "black"),
+        legend.position = "none") + 
+  scale_x_continuous(breaks = c(1,2,3,4,6,8,9)) + coord_cartesian(ylim = c(0, 35)) + ggtitle('behavior')
+
+
+library(cowplot)
+plot_grid(behavior_plot, sim_plot, rel_widths = c(3, 3))
+
+```
 # Best parameters - RMSE
 
 ```{r}
-top_param_aligned = aligned_EIG_df
+top_param_aligned = aligned_EIG_CV %>% arrange(rmse) %>% first()
 aligned_overall_res = viz_top_param(aligned_data, grouped_infant_means, top_param_aligned$param_id)
 
-top_param_resnet50 = resnet50_EIG_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_resnet50 = resnet50_EIG_CV %>% arrange(rmse) %>% first()
 resnet50_overall_res = viz_top_param(resnet50_data, grouped_infant_means, top_param_resnet50$param_id)
 
-top_param_KL = resnet50_KL_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_KL = resnet50_KL_CV %>% arrange(rmse) %>% first()
 KL_overall_res = viz_top_param(KL_data, grouped_infant_means, top_param_KL$param_id)
 
-top_param_surprisal_short = resnet50_surprisal_short_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_surprisal_short = resnet50_surprisal_short_CV %>% arrange(rmse) %>% first()
 surprisal_short_overall_res = viz_top_param(surprisal_data_short, grouped_infant_means, top_param_surprisal_short$param_id)
 
-top_param_surprisal_long = resnet50_surprisal_long_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_surprisal_long = resnet50_surprisal_long_CV %>% arrange(rmse) %>% first()
 surprisal_long_overall_res = viz_top_param(surprisal_data_long, grouped_infant_means, top_param_surprisal_long$param_id)
 
-top_param_nonoise = resnet50_nonoise_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_nonoise = resnet50_nonoise_CV %>% arrange(rmse) %>% first()
 nonoise_overall_res = viz_top_param(nonoise_data, grouped_infant_means, top_param_nonoise$param_id)
 
-top_param_nolearning = resnet50_nolearning_CV %>% arrange(desc(mean_rmse)) %>% first()
+top_param_nolearning = resnet50_nolearning_CV %>% arrange(rmse) %>% first()
 nonoise_overall_res = viz_top_param(nolearning_data, grouped_infant_means, top_param_nolearning$param_id)
 
 
