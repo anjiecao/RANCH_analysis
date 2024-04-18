@@ -41,7 +41,7 @@ adult_data_to_fit <- summarize_behavioral_data(adult_bd) %>%
     ungroup() %>% 
     left_join(adult_resnet50_eig %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) 
 
-infant_data_to_fit <- summarize_behavioral_data_infants(infant_bd) %>% 
+infant_data_to_fit <- summarize_behavioral_data_infants(infant_d) %>% 
   ungroup() %>% 
   left_join(infant_resnet50_eig %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
 
@@ -55,9 +55,9 @@ joint_scale_dataset <- adult_data_to_fit %>%
       #select(type, mean_lt, mean_sample)
   ) 
 
-fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = joint_scale_dataset, lower = c(-Inf, 0.0000001))
-sample_slope = fitted_stats$coefficients["param_mean_sample"]
-sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+fitted_stats = lm(mean_lt ~ mean_sample, data = joint_scale_dataset)
+sample_slope = fitted_stats$coefficients["mean_sample"]
+sample_intercept = fitted_stats$coefficients["(Intercept)"]
     
 scaled_data <- joint_scale_dataset %>% 
   mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
@@ -87,7 +87,58 @@ return(res)
 
   
 run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_eig, infant_sim = infant_resnet50_eig, p_id = 2)
+
 ```
+
+
+
+# try out bootstrapping? 
+
+
+```{r}
+
+
+ adult_trial_counts <- adult_bd %>% 
+    mutate(fam_duration = exposure_duration) %>% 
+    group_by(trial_number,fam_duration,trial_type) %>% count()
+
+infant_trial_counts <- infant_bd %>% 
+   group_by(fam_duration,test_type) %>% count()
+
+adult_trial_counts
+infant_trial_counts
+# ok in the ball park we needs to beef up infants to be x20
+
+
+bootstrapping_infants <- function(df, sample_n){
+  
+  sample_category <- df %>% 
+    distinct(fam_duration, test_type)
+  
+  bootstrapped_df <- lapply(seq(1, nrow(sample_category)), 
+         function(id){
+           
+           fd = sample_category$fam_duration[[id]]
+           tt = sample_category$test_type[[id]]
+           
+           to_be_sampled <- infant_bd %>%
+             filter(fam_duration == fd, test_type == tt) 
+           
+           sampled_indices <- sample(nrow(to_be_sampled), size = sample_n, replace = TRUE)
+           sampled <- to_be_sampled[sampled_indices, ]
+           
+         }) %>% 
+    bind_rows()
+  
+  return (bootstrapped_df)
+  
+}
+
+bootstrapped_infant_df <- bootstrapping_infants(infant_bd, 500)
+
+```
+
+
 
 
 ```{r}
@@ -101,14 +152,39 @@ full_joint_search <- lapply(
     }
   ) %>% 
     bind_rows()
+
+full_joint_search_bs <- lapply(
+    unique(adult_resnet50_eig$param_id), 
+    function(id){
+      run_joint_fit(adult_d = adult_bd, 
+                    infant_d = bootstrapped_infant_df, 
+                    adult_sim = adult_resnet50_eig, 
+                    infant_sim = infant_resnet50_eig, p_id = id)
+    }
+  ) %>% 
+    bind_rows()
 ```
+
+
+```{r}
+full_joint_search %>% 
+  select(param_id, infant_rsquared, infant_rmse) %>% 
+  left_join(full_joint_search_bs %>% select(param_id, infant_rsquared, infant_rmse) %>% 
+              rename(bs_infant_rsquared = infant_rsquared, 
+                     bs_infant_rmse = infant_rmse)) %>% 
+  arrange(-bs_infant_rsquared)
+
+
+
+```
+
 
 ```{r}
 full_joint_search %>% arrange(-adult_rsquared) #159  
 full_joint_search %>% arrange(-infant_rsquared) #31
 
-full_joint_search %>% arrange(-adult_rmse) #5
-full_joint_search %>% arrange(-infant_rmse) #23
+full_joint_search_bs %>% arrange(adult_rmse) #118
+full_joint_search_bs %>% arrange(infant_rmse) #91
 
 ```
 
@@ -119,8 +195,41 @@ param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, wo
   mutate(param_id = if_else(param_id == 159, "adults", "infants"))
 
 param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
-  filter(param_id == 5 | param_id == 23) %>% 
-  mutate(param_id = if_else(param_id == 5, "adults", "infants"))
+  filter(param_id == 118 | param_id == 91) %>% 
+  mutate(param_id = if_else(param_id == 118, "adults", "infants"))
+```
+
+
+# replot the jointly scaled data? 
+
+```{r}
+adult_data_to_fit <- summarize_behavioral_data(adult_bd) %>% 
+    ungroup() %>% 
+    left_join(adult_resnet50_eig %>% filter(param_id == 118) %>% ungroup(), by = c("trial_number", "trial_type")) 
+
+infant_data_to_fit <- summarize_behavioral_data_infants(bootstrapped_infant_df) %>% 
+  ungroup() %>% 
+  left_join(infant_resnet50_eig %>% filter(param_id == 91) %>% ungroup(), by = c("fam_duration", "test_type")) 
+
+joint_scale_dataset <- adult_data_to_fit %>% 
+  mutate(type = "adults") %>% 
+  #select(type, mean_lt, mean_sample) %>% 
+  mutate(mean_lt = mean_lt / 1000) %>% 
+  bind_rows(
+    infant_data_to_fit %>% 
+      mutate(type = "infants")  
+      #select(type, mean_lt, mean_sample)
+  ) 
+
+fitted_stats = lm(mean_lt ~ mean_sample, data = joint_scale_dataset)
+sample_slope = fitted_stats$coefficients["mean_sample"]
+sample_intercept = fitted_stats$coefficients["(Intercept)"]
+
+sample_slope
+sample_intercept
+    
+scaled_data <- joint_scale_dataset %>% 
+  mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
 ```
 
 
@@ -131,9 +240,14 @@ adult_scaled <- scaled_data %>%
   geom_point()
 
 scaled_data %>% 
-  filter(type == "infants") %>% 
+  filter(type == "adults") %>% 
+  select(-fam_duration, -test_type) %>% 
+  rename(fam_duration = trial_number, 
+         test_type = trial_type) %>% 
+  bind_rows(scaled_data %>% filter(type == "infants")) %>% 
   ggplot(aes(x = fam_duration, y = scaled_samples, color = test_type)) + 
-  geom_point()
+  geom_point() + 
+  facet_wrap(~type)
 
 ```
 
