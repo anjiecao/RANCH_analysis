@@ -80,57 +80,6 @@ res = tibble(
 
 return(res)
 }
-
-
-run_joint_fit_new <- function(adult_d, infant_d, adult_sim, infant_sim){
-
-adult_data_to_fit <- summarize_behavioral_data(adult_bd) %>% 
-    ungroup() %>% left_join(adult_resnet50_eig, by = c("trial_number", "trial_type")) 
-
-infant_data_to_fit <- summarize_behavioral_data_infants(infant_d) %>% 
-  ungroup() %>% 
-  left_join(infant_resnet50_eig %>% ungroup(), by = c("fam_duration", "test_type")) 
-
-joint_scale_dataset <- adult_data_to_fit %>% 
-  mutate(type = "adults") %>% 
-  #select(type, mean_lt, mean_sample) %>% 
-  mutate(mean_lt = mean_lt / 1000) %>% 
-  bind_rows(
-    infant_data_to_fit %>% 
-      mutate(type = "infants")  
-      #select(type, mean_lt, mean_sample)
-  ) 
-
-fit_df = tibble()
-
-param_infants = infant_sim$param_id
-param_adults = adult_sim$param_id
-
-  for (p_i in param_infants) {
-    for (p_a in param_adults) {
-
-      fitted_stats = lm(mean_lt ~ 0 + mean_sample, data = joint_scale_dataset %>% filter((param_id == p_i & type == 'infants') | (param_id == p_a & type == 'adults')))
-      sample_slope = fitted_stats$coefficients["mean_sample"]
-      sample_intercept = 0 #fitted_stats$coefficients["(Intercept)"]
-          
-      scaled_data <- joint_scale_dataset %>% 
-        mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
-
-     #calculate the r2 and rmse
-     rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
-     rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
-      
-     fit_df = rbind(fit_df, tibble(p_i = p_i, p_a = p_a, rsquared = rsquared, rmse = rmse))
-     
-      
-    }
-  }
-
-return(fit_df)
-}
-
-fit_df = run_joint_fit_new(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_eig, infant_sim = infant_resnet50_eig)
-
 ```
 
 
@@ -157,8 +106,6 @@ full_joint_search %>%
   left_join(full_joint_search %>% select(param_id, infant_rsquared, infant_rmse)) %>%
   arrange(infant_rsquared)
 
-
-
 ```
 
 
@@ -183,8 +130,8 @@ ggplot(full_joint_search, aes(x = infant_rmse)) + geom_histogram()
 ```{r}
 param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_eig.csv"))
 param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
-  filter(param_id == 159 | param_id == 31) %>% 
-  mutate(param_id = if_else(param_id == 159, "adults", "infants"))
+  filter(param_id == 144 | param_id == 5) %>% 
+  mutate(param_id = if_else(param_id == 144, "adults", "infants"))
 
 param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
   filter(param_id == 118 | param_id == 91) %>% 
@@ -257,11 +204,11 @@ adult_scaled <- scaled_data %>%
   geom_point()
 
 scaled_data %>% 
-  filter(type == "adults") %>% 
+  filter(type == "adults", param_id == 144) %>% 
   select(-fam_duration, -test_type) %>% 
   rename(fam_duration = trial_number, 
          test_type = trial_type) %>% 
-  bind_rows(scaled_data %>% filter(type == "infants")) %>% 
+  bind_rows(scaled_data %>% filter(type == "infants", param_id == 23)) %>% 
   ggplot(aes(x = fam_duration, y = scaled_samples, color = test_type)) + 
   stat_summary()  +
   facet_wrap(~type) + theme_classic(25) + 

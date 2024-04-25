@@ -1,4 +1,16 @@
 
+renaming <- function(df) {
+  df <- df %>%
+    group_by(param_id, trial_type) %>%
+    filter(all(2:10 %in% trial_number)) %>% # only keep parameters for which all fam durations have been computed
+    ungroup() %>%
+    rename(test_type = trial_type) %>%
+    mutate(fam_duration = trial_number - 1,
+           test_type = case_when(test_type == 'background' ~ 'fam', test_type == 'deviant' ~ 'nov')) 
+  return(df)
+}
+
+
 run_all_kfold <- function(sim_data, behavioral_data){
   
   full_k_fold_res <- lapply(
