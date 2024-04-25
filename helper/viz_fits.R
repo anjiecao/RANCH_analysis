@@ -45,7 +45,7 @@ renaming <- function(df) {
 }
 
 get_param_stats <- function(df){
-  df = df %>% group_by(param_id) %>% 
+  df = df %>% filter(!is.na(mean_rsquared)) %>% group_by(param_id) %>% 
     summarize(r2 = mean(mean_rsquared), rmse = mean(mean_rmse), 
               r2_lb = quantile(mean_rsquared, 0.025), r2_ub = quantile(mean_rsquared, 0.975),
               rmse_lb = quantile(mean_rmse, 0.025), rmse_ub = quantile(mean_rmse, 0.975))
