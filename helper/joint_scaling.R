@@ -28,9 +28,6 @@ run_joint_fit <- function(adult_d, infant_d, adult_sim, infant_sim){
   
   for (p_i in param_infants) {
     
-    print("infant_param")
-    print(p_i)
-    
     for (p_a in param_adults) {
       
       counter = counter + 1
@@ -44,6 +41,7 @@ run_joint_fit <- function(adult_d, infant_d, adult_sim, infant_sim){
       sample_slope = fitted_stats$coefficients["mean_sample"]
       sample_intercept = 0 #fitted_stats$coefficients["(Intercept)"]
       
+
       scaled_data <- cur_data %>% 
         mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
       

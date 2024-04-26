@@ -16,39 +16,95 @@ source(here("helper/joint_scaling.R"))
 adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
 infant_bd <- read_csv(here("infants/data/infant_exposure_duration.csv"))%>% filter(fam_or_test == 'test', !exclude)
 
-adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+# EIG
+adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv")) %>% 
+  filter(!(trial_number == 1 & trial_type == 'deviant')) 
 infant_resnet50_eig <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
-
 infant_resnet50_eig <- infant_resnet50_eig %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 
+# KL
+adult_resnet50_KL <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_KL.csv")) %>% 
+  filter(!(trial_number == 1 & trial_type == 'deviant')) 
+infant_resnet50_KL <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_KL.csv"))
+infant_resnet50_KL <- infant_resnet50_KL %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
+
+# surprisal
+adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv")) %>% filter(!(trial_number == 1 & trial_type == 'deviant')) 
+infant_resnet50_surprisal <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
+infant_resnet50_surprisal <- infant_resnet50_surprisal %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
+# No noise
+adult_resnet50_NN <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))  %>% filter(!(trial_number == 1 & trial_type == 'deviant')) 
+infant_resnet50_NN <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
+infant_resnet50_NN <- infant_resnet50_NN %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
+# No learning
+adult_resnet50_NL <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv")) %>% filter(!(trial_number == 1 & trial_type == 'deviant')) 
+infant_resnet50_NL <- read_csv(here("simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
+infant_resnet50_NL <- infant_resnet50_NL %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
+
+
 ```
 
 ```{r}
-fit_df = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_eig, infant_sim = infant_resnet50_eig)
+# EIG
+EIG_fit = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_eig, infant_sim = infant_resnet50_eig)
+write_csv(EIG_fit, "cached_data/joint_scaling_EIG.csv")
 
-write_csv(fit_df, "cached_data/joint_scaling_df.csv")
+KL_fit = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_KL, infant_sim = infant_resnet50_KL)
+write_csv(KL_fit, "cached_data/joint_scaling_KL.csv")
 
-fit_df = read_csv("cached_data/joint_scaling_df.csv")
+surprisal_fit = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_surprisal, infant_sim = infant_resnet50_surprisal)
+write_csv(surprisal_fit, "cached_data/joint_scaling_surprisal.csv")
 
-# best adult param
-adult_param = fit_df %>% arrange(-rsquared) %>% first() %>% pull(p_a)
+NN_fit = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_NN, infant_sim = infant_resnet50_NN)
+write_csv(NN_fit, "cached_data/joint_scaling_NN.csv")
 
-# best infant_param
-infant_param = fit_df %>% arrange(-rsquared) %>% first() %>% pull(p_i)
+NL_fit = run_joint_fit(adult_d = adult_bd, infant_d = infant_bd, adult_sim = adult_resnet50_NL, infant_sim = infant_resnet50_NL)
+write_csv(NL_fit, "cached_data/joint_scaling_NL.csv")
+
+# Read
+EIG_fit = read_csv("cached_data/joint_scaling_EIG.csv")
+KL_fit = read_csv("cached_data/joint_scaling_KL.csv")
+surprisal_fit = read_csv("cached_data/joint_scaling_surprisal.csv")
+NN_fit = read_csv("cached_data/joint_scaling_NN.csv")
+NL_fit = read_csv( "cached_data/joint_scaling_NL.csv")
+
+# collect params, subtract 1 beacuse param id's are 0 indexed
+EIG_params = EIG_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse) 
+KL_params = KL_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse) 
+surprisal_params = surprisal_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse) 
+NN_params = NN_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse) 
+NL_params = NL_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse) 
 
 param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_eig.csv"))
-fit_df = fit_df %>% rename(param_id = p_a) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
+fit_df = EIG_fit %>% rename(param_id = p_i) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
 
-ggplot(fit_df, aes(x = rmse, fill = world_EIGs)) + geom_histogram()
+ggplot(fit_df, aes(x = rmse, fill = sd_epsilon)) + geom_histogram()
 
-ggplot(fit_df, aes(x = rmse)) + geom_histogram()
 
 
 ```
 
+# Replot model predictions
 ```{r}
 
+# EIG
+bind_rows(infant_resnet50_eig %>% filter(param_id == EIG_params$p_i) %>% mutate(type = 'infant', scaled_sample = mean_sample *  0.2168894), adult_resnet50_eig %>% filter(param_id == EIG_params$p_a) %>% mutate(type = 'adult', test_type = ifelse(trial_type == 'background', 'fam', 'nov'), scaled_sample = mean_sample * 0.2168894)) %>% ggplot(aes(x = trial_number, y = scaled_sample, color = test_type)) + geom_point() + facet_wrap(~type) + theme_classic(25) + ylab("Scaled samples (sec)") + xlab("trial number") + ggtitle("EIG predictions, RMSE: ", round(EIG_params$rmse,2))
 
+# KL
+bind_rows(infant_resnet50_KL %>% filter(param_id == KL_params$p_i) %>% mutate(type = 'infant', scaled_sample = mean_sample *  0.2168894), adult_resnet50_KL %>% filter(param_id == KL_params$p_a) %>% mutate(type = 'adult', test_type = ifelse(trial_type == 'background', 'fam', 'nov'), scaled_sample = mean_sample * 0.2168894)) %>% ggplot(aes(x = trial_number, y = scaled_sample, color = test_type)) + geom_point() + facet_wrap(~type) + theme_classic(25) + ylab("Scaled samples (sec)") + xlab("trial number") + ggtitle("KL predictions, RMSE: ", round(KL_params$rmse,2))
+
+# surprisal
+bind_rows(infant_resnet50_surprisal %>% filter(param_id == surprisal_params$p_i) %>% mutate(type = 'infant', scaled_sample = mean_sample *  0.2168894), adult_resnet50_surprisal %>% filter(param_id == surprisal_params$p_a) %>% mutate(type = 'adult', test_type = ifelse(trial_type == 'background', 'fam', 'nov'), scaled_sample = mean_sample * 0.2168894)) %>% ggplot(aes(x = trial_number, y = scaled_sample, color = test_type)) + geom_point() + facet_wrap(~type) + theme_classic(25) + ylab("Scaled samples (sec)") + xlab("trial number") + ggtitle("surprisal, RMSE: ", round(surprisal_params$rmse,2))
+
+# NN
+bind_rows(infant_resnet50_NN %>% filter(param_id == NN_params$p_i) %>% mutate(type = 'infant', scaled_sample = mean_sample *  0.2168894), adult_resnet50_NN %>% filter(param_id == NN_params$p_a) %>% mutate(type = 'adult', test_type = ifelse(trial_type == 'background', 'fam', 'nov'), scaled_sample = mean_sample * 0.2168894)) %>% ggplot(aes(x = trial_number, y = scaled_sample, color = test_type)) + geom_point() + facet_wrap(~type) + theme_classic(25) + ylab("Scaled samples (sec)") + xlab("trial number") + ggtitle("NN, RMSE: ", round(NN_params$rmse,2))
+
+# NL
+bind_rows(infant_resnet50_NL %>% filter(param_id == NL_params$p_i) %>% mutate(type = 'infant', scaled_sample = mean_sample *  0.2168894), adult_resnet50_NL %>% filter(param_id == NL_params$p_a) %>% mutate(type = 'adult', test_type = ifelse(trial_type == 'background', 'fam', 'nov'), scaled_sample = mean_sample * 0.2168894)) %>% ggplot(aes(x = trial_number, y = scaled_sample, color = test_type)) + geom_point() + facet_wrap(~type) + theme_classic(25) + ylab("Scaled samples (sec)") + xlab("trial number") + ggtitle("NL, RMSE: ", round(NL_params$rmse,2))
 
 ```
 
