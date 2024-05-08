@@ -1,5 +1,10 @@
 
 # Big files 
+simulations/sim_adult_exposure_duration/00_raw_sim/unlinked_resnet50_surprisal_missingparams.csv
+simulations/sim_adult_exposure_duration/00_raw_sim/unlinked_resnet50_surprisal.csv
+
+
+
 sim_res/00_param_search_raw/*.csv
 
 

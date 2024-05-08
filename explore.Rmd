@@ -18,7 +18,35 @@ adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_durat
 adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
 adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal.csv"))
 adult_resnet50_surprisal_missing <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing.csv"))
+adult_resnet50_surprisal_missing_b <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing_b.csv"))
+adult_resnet50_surprisal_missing_c <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing_c.csv"))
+adult_resnet50_surprisal_missing_d <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_surprisal_missing_d.csv"))
 
+
+
+```
+
+
+```{r fig.width=8, fig.height=8}
+adult_resnet50_surprisal_missing_c %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "4th") %>% 
+  bind_rows(
+    adult_resnet50_surprisal_missing_b %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "3rd"),
+    adult_resnet50_surprisal_missing %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "2nd"),
+        adult_resnet50_surprisal %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "1st"),
+    adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)) %>% mutate(run_id = "5th")
+  ) %>% 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_point() + 
+  facet_grid(run_id~param_id, scales = "free_y") + 
+  scale_x_continuous(breaks = seq(1, 10))
+
+
+
+adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)) %>% 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_point() + 
+  facet_wrap(~param_id, scales = "free_y") + 
+  scale_x_continuous(breaks = seq(1, 10))
 ```
 
 
@@ -31,12 +59,32 @@ adult_kfold_resnet50_kl = run_all_kfold(sim_data = adult_resnet50_kl, behavioral
 # first surprisal has some missing parameters, so ran twice
 adult_kfold_resnet50_surprisal = run_all_kfold(sim_data = adult_resnet50_surprisal, behavioral_data = adult_bd)
 adult_kfold_resnet50_surprisal_missing = run_all_kfold(sim_data = adult_resnet50_surprisal_missing, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal_missing_b = run_all_kfold(sim_data = adult_resnet50_surprisal_missing_b, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal_missing_c = run_all_kfold(sim_data = adult_resnet50_surprisal_missing_c, behavioral_data = adult_bd)
+adult_kfold_resnet50_surprisal_missing_d = run_all_kfold(sim_data = adult_resnet50_surprisal_missing_d, behavioral_data = adult_bd)
+
+
 first_pass_surprisal <- adult_kfold_resnet50_surprisal %>% 
   filter(!is.na(mean_rsquared))
 second_pass_surprisal <- adult_kfold_resnet50_surprisal_missing %>% 
   filter(!is.na(mean_rsquared))
-adult_kfold_resnet50_surprisal <- bind_rows(first_pass_surprisal, second_pass_surprisal) 
+third_pass_surprisal <- adult_kfold_resnet50_surprisal_missing_b %>% 
+  filter(!is.na(mean_rsquared))
+fourth_pass_surprisal <- adult_kfold_resnet50_surprisal_missing_c %>% 
+  filter(!is.na(mean_rsquared))
+fifth_pass_surprisal <- adult_kfold_resnet50_surprisal_missing_d %>% 
+  filter(!is.na(mean_rsquared))
+current_adult_kfold_resnet50_surprisal <- bind_rows(first_pass_surprisal, second_pass_surprisal, third_pass_surprisal, fourth_pass_surprisal, fifth_pass_surprisal) 
 
+
+# reorganize other surprisal files 
+adult_resnet50_surprisal<- adult_resnet50_surprisal %>% filter(param_id %in% first_pass_surprisal$param_id)
+adult_resnet50_surprisal_missing <- adult_resnet50_surprisal_missing %>% filter(param_id %in% second_pass_surprisal$param_id)
+adult_resnet50_surprisal_missing_b <- adult_resnet50_surprisal_missing_b %>% filter(param_id %in% third_pass_surprisal$param_id)
+adult_resnet50_surprisal_missing_c <- adult_resnet50_surprisal_missing_c %>% filter(param_id %in% fourth_pass_surprisal$param_id)
+adult_resnet50_surprisal_missing_d <- adult_resnet50_surprisal_missing_d %>% filter(param_id %in% fifth_pass_surprisal$param_id)
+linked_resnet50_full_surprisal <- bind_rows(adult_resnet50_surprisal, adult_resnet50_surprisal_missing, adult_resnet50_surprisal_missing_b, adult_resnet50_surprisal_missing_c, adult_resnet50_surprisal_missing_d)
+linked_resnet50_full_surprisal %>% write_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_full_surprisal.csv"))
 
 
 saveRDS(adult_kfold_aligned_eig, here("cached_data/adult_kfold_aligned_eig.Rds"))
@@ -44,10 +92,27 @@ saveRDS(adult_kfold_resnet50_eig, here("cached_data/adult_kfold_resnet50_eig.Rds
 saveRDS(adult_kfold_resnet50_nonoise, here("cached_data/adult_kfold_resnet50_nonoise.Rds"))
 saveRDS(adult_kfold_resnet50_nolearning, here("cached_data/adult_kfold_resnet50_nolearning.Rds"))
 saveRDS(adult_kfold_resnet50_kl, here("cached_data/adult_kfold_resnet50_kl.Rds"))
-saveRDS(adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
+saveRDS(current_adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_resnet50_surprisal.Rds"))
 
 ```
 
+
+
+```{r}
+
+adult_kfold_aligned_eig <- readRDS(here("cached_data/adult_kfold_resnet50_eig.Rds"))
+adult_kfold_resnet50_kl <- readRDS(here("cached_data/adult_kfold_resnet50_kl.Rds"))
+adult_kfold_resnet50_surprisal <- current_adult_kfold_resnet50_surprisal
+
+bind_rows(adult_kfold_aligned_eig %>% mutate(type = "EIG"), 
+          adult_kfold_resnet50_kl %>% mutate(type = "KL"), 
+          adult_kfold_resnet50_surprisal %>% mutate(type = "Surprisal")
+          ) %>% 
+  ggplot(aes(x = mean_rmse)) + 
+  geom_histogram() + 
+  facet_wrap(~type) + 
+  theme_few()
+```
 
 
 

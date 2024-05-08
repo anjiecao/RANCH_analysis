@@ -278,3 +278,95 @@ full_joint_search_bs <- lapply(
     bind_rows()
 
 ```
+<<<<<<< Updated upstream
+=======
+
+
+```{r}
+full_joint_search %>% arrange(-adult_rsquared) #159  
+full_joint_search %>% arrange(-infant_rsquared) #31
+
+full_joint_search_bs %>% arrange(adult_rmse) #best: 118
+full_joint_search_bs %>% arrange(-adult_rmse) #worst: 31
+
+full_joint_search_bs %>% arrange(infant_rmse) #best: 91
+full_joint_search_bs %>% arrange(-infant_rmse) #worst: 16
+
+
+```
+
+```{r}
+param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_eig.csv"))
+param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
+  filter(param_id == 159 | param_id == 31) %>% 
+  mutate(param_id = if_else(param_id == 159, "adults", "infants"))
+
+param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% 
+  filter(param_id == 91 | param_id == 16) %>% 
+  mutate(param_id = if_else(param_id == 91, "Best", "Worst"))
+```
+
+
+# replot the jointly scaled data? 
+
+```{r}
+adult_data_to_fit <- summarize_behavioral_data(adult_bd) %>% 
+    ungroup() %>% 
+    left_join(adult_resnet50_eig %>% filter(param_id == 118) %>% ungroup(), by = c("trial_number", "trial_type")) 
+
+infant_data_to_fit <- summarize_behavioral_data_infants(bootstrapped_infant_df) %>% 
+  ungroup() %>% 
+  left_join(infant_resnet50_eig %>% filter(param_id == 16) %>% ungroup(), by = c("fam_duration", "test_type")) 
+
+joint_scale_dataset <- adult_data_to_fit %>% 
+  mutate(type = "adults") %>% 
+  #select(type, mean_lt, mean_sample) %>% 
+  mutate(mean_lt = mean_lt / 1000) %>% 
+  bind_rows(
+    infant_data_to_fit %>% 
+      mutate(type = "infants")  
+      #select(type, mean_lt, mean_sample)
+  ) 
+
+#fitted_stats = lm(mean_lt ~ mean_sample, data = joint_scale_dataset)
+fitted_stats = lm(mean_lt ~ mean_sample, data = infant_data_to_fit)
+sample_slope = fitted_stats$coefficients["mean_sample"]
+sample_intercept = fitted_stats$coefficients["(Intercept)"]
+
+sample_slope
+sample_intercept
+    
+scaled_data <- infant_data_to_fit %>% 
+  mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept)
+```
+
+
+```{r}
+adult_scaled <- scaled_data %>% 
+  filter(type == "adults") %>% 
+  ggplot(aes(x = trial_number, y = scaled_samples, color = trial_type)) + 
+  geom_point()
+
+scaled_data %>% 
+  filter(type == "adults") %>% 
+  select(-fam_duration, -test_type) %>% 
+  rename(fam_duration = trial_number, 
+         test_type = trial_type) %>% 
+  bind_rows(scaled_data %>% filter(type == "infants")) %>% 
+  ggplot(aes(x = fam_duration, y = scaled_samples, color = test_type)) + 
+  geom_point() + 
+  facet_wrap(~type)
+
+scaled_data %>% 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_point() + 
+  labs(title = "Best fitting, param 118")
+
+scaled_data %>% 
+  ggplot(aes(x = fam_duration, y = mean_sample, color = test_type)) + 
+  geom_point() + 
+  labs(title = "Worst fitting, param 16")
+
+```
+
+>>>>>>> Stashed changes
