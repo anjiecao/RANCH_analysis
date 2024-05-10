@@ -7,6 +7,7 @@ date: "2024-04-08"
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(here)
+library(broom)
 source(here("helper/viz_fits.R"))
 
 ```

@@ -1,0 +1,559 @@
+
+```{r}
+library(tidyverse)
+library(here)
+library(lme4)
+library(ggthemes)
+library(cowplot)
+library(colf)
+library(Metrics)
+
+source(here("helper/run_k_fold.R"))
+source(here("helper/viz_fits.R"))
+
+# reading adult data 
+adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
+adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
+adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
+adult_resnet50_nolearning <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv"))
+adult_resnet50_kl <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_kl.csv"))
+adult_resnet50_surprisal <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_full_surprisal.csv"))
+
+# reading infant data
+infant_data = read_csv(here('infants/data/infant_exposure_duration.csv')) %>% filter(fam_or_test == 'test', !exclude)
+infant_data = infant_data %>% mutate(subj_id = paste0(experiment, subject_num))
+grouped_infant_means = infant_data %>% group_by(test_type, fam_duration) %>% dplyr::summarize(LT = mean(LT))
+
+
+
+infant_resnet50_eig = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv')) 
+infant_resnet50_nonoise = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv'))
+infant_resnet50_nolearning = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_nolearning.csv'))
+infant_resnet50_kl = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_KL.csv'))
+infant_resnet50_surprisal = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_surprisal_short.csv'))
+
+```
+
+
+# Scaling the simulation for plotting 
+
+```{r}
+scaled_adult_resnet50_eig <- scale_all_adult_sim(sim_data = adult_resnet50_eig, raw_d = adult_bd)
+scaled_adult_resnet50_kl <- scale_all_adult_sim(sim_data = adult_resnet50_kl, raw_d = adult_bd)
+scaled_adult_resnet50_surprisal <- scale_all_adult_sim(sim_data = adult_resnet50_surprisal, raw_d = adult_bd)
+scaled_adult_resnet50_nonoise <- scale_all_adult_sim(sim_data = adult_resnet50_nonoise, raw_d = adult_bd)
+scaled_adult_resnet50_nolearning <- scale_all_adult_sim(sim_data = adult_resnet50_nolearning, raw_d = adult_bd)
+
+
+scaled_infant_resnet50_eig <- scale_all_infant_sim(infant_resnet50_eig, grouped_infant_means)
+scaled_infant_resnet50_kl <- scale_all_infant_sim(infant_resnet50_kl, grouped_infant_means)
+scaled_infant_resnet50_surprisal <- scale_all_infant_sim(infant_resnet50_surprisal, grouped_infant_means)
+scaled_infant_resnet50_nonoise <- scale_all_infant_sim(infant_resnet50_nonoise, grouped_infant_means) # only has 53 param_id
+scaled_infant_resnet50_nolearning <- scale_all_infant_sim(infant_resnet50_nolearning, grouped_infant_means)
+
+
+saveRDS(scaled_adult_resnet50_eig,here("cached_data/scaled_adult_resnet50_eig.Rds"))
+saveRDS(scaled_adult_resnet50_kl, here("cached_data/scaled_adult_resnet50_kl.Rds"))
+saveRDS(scaled_adult_resnet50_surprisal,here("cached_data/scaled_adult_resnet50_surprisal.Rds"))
+saveRDS(scaled_adult_resnet50_nonoise,here("cached_data/scaled_adult_resnet50_nonoise.Rds"))
+saveRDS(scaled_adult_resnet50_nolearning,here("cached_data/scaled_adult_resnet50_nolearning.Rds"))
+
+
+saveRDS(scaled_infant_resnet50_eig,here("cached_data/scaled_infant_resnet50_eig.Rds"))
+saveRDS(scaled_infant_resnet50_kl, here("cached_data/scaled_infant_resnet50_kl.Rds"))
+saveRDS(scaled_infant_resnet50_surprisal,here("cached_data/scaled_infant_resnet50_surprisal.Rds"))
+saveRDS(scaled_infant_resnet50_nonoise,here("cached_data/scaled_infant_resnet50_nonoise.Rds"))
+saveRDS(scaled_infant_resnet50_nolearning,here("cached_data/scaled_infant_resnet50_nolearning.Rds"))
+
+
+```
+
+
+
+
+# Plotting behaviors!
+
+## infant 
+
+```{r}
+
+# pre-registered model according to: https://osf.io/w6pgu?view_only=39ee108159884761a0c5bc68d11918df
+#log(LT) ~ poly(familiarization duration, 2) * test event + block number + (1|subject)
+
+
+#infant_model <- lmer(log(LT) ~ poly(fam_duration, 2) * test_type + block_num + (1|unique_id), data = infant_data)
+infant_model <- lmer(log(LT) ~ fam_duration * test_type + block_num + (1|unique_id), data = infant_data)
+new_infant_data <- infant_data %>% 
+  distinct(fam_duration, test_type, block_num) %>% 
+  mutate(unique_id = 1)
+new_infant_data$pred = stats::predict(infant_model, re.form = NA, newdata = new_infant_data) 
+new_infant_data <- new_infant_data %>% 
+  ungroup() %>% 
+  group_by(fam_duration, test_type) %>% 
+  tidyboot::tidyboot_mean(pred, na.rm=T) %>% 
+  mutate(pred = empirical_stat, 
+         pred_lb = ci_lower, 
+         pred_ub = ci_upper)
+
+
+
+infant_pred_no_shade <- infant_data %>% 
+  ggplot(aes(x=as.numeric(fam_duration), y=log(LT), group=test_type, color = test_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", position = position_dodge(width = 1)) + 
+  geom_line(data = new_infant_data, aes(x = fam_duration, y = pred, color = test_type, group = test_type)) + 
+  theme_few() + 
+  theme(legend.position = "none") + 
+  scale_x_continuous(breaks = c(1,2,3,4,6,8,9))
+
+infant_pred_has_shade <- infant_data %>% 
+  ggplot(aes(x=as.numeric(fam_duration), y=log(LT), group=test_type, color = test_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", position = position_dodge(width = 1)) + 
+  geom_line(data = new_infant_data, aes(x = fam_duration, y = pred, color = test_type, group = test_type)) + 
+  geom_ribbon(data = new_infant_data, aes(x = fam_duration, ymin = pred_lb, ymax = pred_ub, y = pred, group = test_type, fill = test_type), colour = NA, alpha = .3) + 
+  theme_few() + 
+  scale_x_continuous(breaks = c(1,2,3,4,6,8,9)) + 
+  theme(legend.position = "none")
+
+infant_connect_has_shade <- infant_data %>% 
+  ggplot(aes(x=as.numeric(fam_duration), y=log(LT), group=test_type, color = test_type)) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", position = position_dodge(width = 1)) + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line", position = position_dodge(width = 1)) + 
+  #geom_line(data = new_infant_data, aes(x = fam_duration, y = pred, color = test_type, group = test_type)) + 
+  geom_ribbon(data = new_infant_data, aes(x = fam_duration, ymin = pred_lb, ymax = pred_ub, y = pred, group = test_type, fill = test_type), colour = NA, alpha = .3) + 
+  theme_few() + 
+  scale_x_continuous(breaks = c(1,2,3,4,6,8,9)) + 
+  theme(legend.position = "none")
+
+
+infant_smooth_has_shade <- infant_data %>% 
+  ggplot(aes(x=as.numeric(fam_duration), y=log(LT), group=test_type, color = test_type)) + 
+  #geom_point(alpha=0.1, size = 2, position = position_jitterdodge(jitter.width = 0.15)) + 
+  geom_smooth(method ="lm", alpha = 0.4) + stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", position = position_dodge(width = 1)) + xlab('Prior exposures') + ylab('Looking time (s)') + labs(color = 'Test type') + 
+  theme_few() + 
+  scale_x_continuous(breaks = c(1,2,3,4,6,8,9)) + 
+  theme(legend.position = "none")
+
+
+infant_smooth_has_shade
+```
+
+
+
+
+## adult 
+
+```{r}
+model_d <- adult_bd %>% 
+  mutate(is_first_trial = (trial_number == 1)) %>% 
+  mutate(block_id = block_id + 1)
+
+
+model <- lmer(log(total_rt) ~ trial_number + is_first_trial + trial_number * trial_type + log(block_id) + (1 | prolific_id) , data = model_d)
+
+new_data <- adult_bd %>% 
+  mutate(is_first_trial = trial_number == 1) %>% 
+  mutate(block_id = block_id + 1) %>%
+  distinct(trial_number, is_first_trial, trial_type, block_id) %>% 
+  mutate(prolific_id = 1)
+
+new_data$pred = stats::predict(model, re.form = NA, newdata = new_data) 
+
+new_data <- new_data %>% 
+  ungroup() %>% 
+  group_by(trial_type, trial_number) %>% 
+  tidyboot::tidyboot_mean(pred, na.rm=T) %>% 
+  mutate(pred = empirical_stat, 
+         pred_lb = ci_lower, 
+         pred_ub = ci_upper)
+
+
+adult_pred_no_shade <- adult_bd %>% 
+  ggplot(aes(x = trial_number, y = log(total_rt), color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  #geom_ribbon(data = new_data, aes(x = trial_number, y = pred, ymin = pred_lb, ymax = pred_ub, fill = trial_type, group = trial_type, alpha = .1), colour = NA) + 
+  geom_line(data = new_data, aes(x = trial_number, y = pred, color = trial_type, group = trial_type)) + 
+  theme_few()  + 
+  theme(legend.position = "none") + 
+  ylab("Log-transformed looking time") + 
+  xlab("Trial Number")
+
+
+adult_pred_has_shade <- adult_bd %>% 
+  ggplot(aes(x = trial_number, y = log(total_rt), color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  geom_line(data = new_data, aes(x = trial_number, y = pred, color = trial_type, group = trial_type)) + 
+  geom_ribbon(data = new_data, aes(x = trial_number, ymin = pred_lb, ymax = pred_ub, y = pred, group = trial_type, fill = trial_type), colour = NA, alpha = .3) + 
+  theme_few()  + 
+  theme(legend.position = "none") + 
+  ylab("Log-transformed looking time") + 
+  xlab("Trial Number")
+
+adult_connect_has_shade <- adult_bd %>% 
+  ggplot(aes(x = trial_number, y = log(total_rt), color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line")+   geom_ribbon(data = new_data, aes(x = trial_number, ymin = pred_lb, ymax = pred_ub, y = pred, group = trial_type, fill = trial_type), colour = NA, alpha = .3) + 
+  theme_few()  + 
+  theme(legend.position = "none") + 
+  ylab("Log-transformed looking time") + 
+  xlab("Trial Number")
+
+adult_smooth_has_shade <- adult_bd %>% 
+  ggplot(aes(x = trial_number, y = log(total_rt), color = trial_type)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  #geom_ribbon(data = new_data, aes(x = trial_number, y = pred, ymin = pred_lb, ymax = pred_ub, fill = trial_type, group = trial_type, alpha = .1), colour = NA) + 
+  geom_smooth(method ="lm", alpha = 0.4) + 
+  theme_few()  + 
+  theme(legend.position = "none") + 
+  ylab("Log-transformed looking time") + 
+  xlab("Trial Number")
+
+adult_pred_no_shade
+```
+
+## side by side comparison
+
+```{r}
+d <- bind_rows(adult_bd |> 
+                 rename(x = trial_number,
+                        y = total_rt, 
+                        tt = trial_type) |>
+                 mutate(group = "Adults", 
+                        y = y / 1000, 
+                        tt = ifelse(tt == "background", 
+                                    "Familiar", "Novel")), 
+               infant_data |> 
+                 rename(x = fam_duration, 
+                        y = LT, 
+                        tt = test_type) |>
+                 mutate(group = "Infants (7 - 9 months)", 
+                        y = y, 
+                        tt = ifelse(tt == "fam", "Familiar", 
+                                    "Novel")))
+
+d %>% 
+  ggplot(aes(x=x, y=y, group=tt, color = tt)) + 
+  stat_summary(fun.data = "mean_cl_boot",
+               geom = "pointrange",
+               position = position_dodge(width = .3)) +
+  stat_summary(geom = "line",
+               position = position_dodge(width = .3)) +
+  # geom_smooth(method = "loess") + 
+  facet_wrap(~group, scale = "free_y") + 
+  theme_few() + 
+  scale_y_log10() + 
+  ylab("Looking time (s)") +
+  xlab("Trial Number") + 
+  ggthemes::scale_color_solarized(name = "Trial type") +
+  theme(legend.position = "bottom")
+```
+
+## get adult 
+
+```{r}
+adult_bp <- d %>% 
+  filter(group == "Adults") %>% 
+  ggplot(aes(x=x, y=y, group=tt, color = tt)) + 
+  stat_summary(fun.data = "mean_cl_boot",
+               geom = "pointrange",
+               position = position_dodge(width = .3)) +
+  stat_summary(geom = "line",
+               position = position_dodge(width = .3)) +
+  # geom_smooth(method = "loess") + 
+  #facet_wrap(~group, scale = "free_y") + 
+  theme_few() + 
+  scale_y_log10() + 
+  ylab("Looking time (s)") +
+  xlab("Trial Number") + 
+  ggthemes::scale_color_solarized(name = "Trial type") +
+  theme(legend.position = "none")
+```
+
+## get infant
+
+```{r}
+infant_bp <- d %>% 
+  filter(group == "Infants (7 - 9 months)") %>% 
+  ggplot(aes(x=x, y=y, group=tt, color = tt)) + 
+  stat_summary(fun.data = "mean_cl_boot",
+               geom = "pointrange",
+               position = position_dodge(width = .3)) +
+  stat_summary(geom = "line",
+               position = position_dodge(width = .3)) +
+  # geom_smooth(method = "loess") + 
+  #facet_wrap(~group, scale = "free_y") + 
+  theme_few() + 
+  scale_y_log10() + 
+  ylab("Looking time (s)") +
+  xlab("Trial Number") + 
+  ggthemes::scale_color_solarized(name = "Trial type") +
+  theme(legend.position = "none")
+```
+
+
+
+
+### both with prediction lines 
+
+```{r}
+plot_grid(adult_pred_no_shade, infant_pred_no_shade)
+
+```
+
+
+```{r}
+plot_grid(adult_pred_has_shade, infant_pred_has_shade)
+```
+
+
+```{r}
+plot_grid(adult_smooth_has_shade, infant_smooth_has_shade)
+
+```
+
+```{r}
+plot_grid(adult_connect_has_shade, infant_connect_has_shade)
+```
+
+
+# Plotting simulation!
+
+```{r}
+scaled_adult_resnet50_eig <- scale_all_adult_sim(sim_data = adult_resnet50_eig, raw_d = adult_bd)
+scaled_adult_resnet50_kl <- scale_all_adult_sim(sim_data = adult_resnet50_kl, raw_d = adult_bd)
+scaled_adult_resnet50_surprisal <- scale_all_adult_sim(sim_data = adult_resnet50_surprisal, raw_d = adult_bd)
+scaled_adult_resnet50_nonoise <- scale_all_adult_sim(sim_data = adult_resnet50_nonoise, raw_d = adult_bd)
+scaled_adult_resnet50_nolearning <- scale_all_adult_sim(sim_data = adult_resnet50_nolearning, raw_d = adult_bd)
+
+
+scaled_infant_resnet50_eig <- scale_all_infant_sim(infant_resnet50_eig, grouped_infant_means)
+scaled_infant_resnet50_kl <- scale_all_infant_sim(infant_resnet50_kl, grouped_infant_means)
+scaled_infant_resnet50_surprisal <- scale_all_infant_sim(infant_resnet50_surprisal, grouped_infant_means)
+scaled_infant_resnet50_nonoise <- scale_all_infant_sim(infant_resnet50_nonoise, grouped_infant_means) # only has 53 param_id
+scaled_infant_resnet50_nolearning <- scale_all_infant_sim(infant_resnet50_nolearning, grouped_infant_means)
+
+```
+
+## adult simulation 
+
+```{r}
+
+facet_labels <- tibble(
+  type = c("EIG","KL","Surprisal", "No Learning", "No Noise"),
+  label = c("EIG","KL","Surprisal", "No Learning", "No Noise"), 
+  x = c(6, 6, 6, 6, 6), 
+  y = c(1, 1, 1, 1, 1),
+) %>% mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) 
+
+set_lim_fixed_scale_df <- bind_rows(scaled_adult_resnet50_eig %>% mutate(type = "EIG"),
+          scaled_adult_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_adult_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_adult_resnet50_nonoise %>% mutate(type = "No Noise"), 
+          scaled_adult_resnet50_nolearning %>% mutate(type = "No Learning")) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  group_by(
+    trial_number, trial_type, type
+  ) %>% 
+  tidyboot::tidyboot_mean(column = scaled_samples)
+  
+  
+set_lim_fixed_scale_df %>% 
+  ggplot() +
+  theme_few() +
+  geom_pointrange(aes(x = trial_number, y = empirical_stat/1000, ymin = ci_lower / 1000, ymax = ci_upper / 1000, color = trial_type)) + 
+  scale_y_log10() + 
+  #coord_cartesian(ylim= c(1, 3.5)) +
+  facet_wrap(~type, scales = "free")
+  
+  #geom_line(aes(x = trial_number, y = empirical_stat/1000, color = trial_type, group = trial_type)) + 
+  #ylim(0, 4) + 
+  #scale_y_log10() + 
+  facet_wrap(~type, scales = "free") + 
+  theme(
+    legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+    legend.background = element_rect(fill = "white", colour = NA) 
+  ) + 
+  ylab("") + 
+  xlab("") + 
+  guides(color=guide_legend(title="Trial Type")) + 
+  ggthemes::scale_color_solarized(name = "Trial type") + 
+  theme(
+  strip.background = element_blank(),
+  strip.text.x = element_blank())
+
+
+```
+
+```{r}
+set_lim_fixed_scale_df %>% 
+  filter(type == "EIG") %>% 
+  ggplot() +
+  theme_few() +
+  geom_pointrange(aes(x = trial_number, y = empirical_stat/1000, ymin = ci_lower / 1000, ymax = ci_upper / 1000, color = trial_type)) + 
+  scale_y_log10() + 
+  labs(title = "EIG")
+
+set_lim_fixed_scale_df %>% 
+  filter(type == "KL") %>% 
+  ggplot() +
+  theme_few() +
+  geom_pointrange(aes(x = trial_number, y = empirical_stat/1000, ymin = ci_lower / 1000, ymax = ci_upper / 1000, color = trial_type)) + 
+  scale_y_log10() + 
+  labs(title = "KL")
+
+set_lim_fixed_scale_df %>% 
+  filter(type == "Surprisal") %>% 
+  ggplot() +
+  theme_few() +
+  geom_pointrange(aes(x = trial_number, y = empirical_stat/1000, ymin = ci_lower / 1000, ymax = ci_upper / 1000, color = trial_type)) + 
+  scale_y_log10() + 
+  labs(title = "Surprisal")
+```
+
+
+
+```{r}
+set_lim_free_scale_p <- bind_rows(scaled_adult_resnet50_eig %>% mutate(type = "EIG"),
+          scaled_adult_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_adult_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_adult_resnet50_nonoise %>% mutate(type = "No Noise"), 
+          scaled_adult_resnet50_nolearning %>% mutate(type = "No Learning")) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot(aes(x = trial_number, y = log(mean_sample), color = trial_type)) +
+  theme_few() +
+  stat_summary(fun.data = "mean_cl_boot") + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line") + 
+  ylim(0, 4) + 
+  facet_wrap(~type,scales = "free_y") + 
+  theme(
+    legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+    legend.background = element_rect(fill = "white", colour = NA) 
+  ) + 
+  ylab("") + 
+  xlab("") + 
+  guides(color=guide_legend(title="Trial Type")) + 
+  ggthemes::scale_color_solarized(name = "Trial type")
+```
+
+```{r}
+facet_labels <- tibble(
+  type = c("EIG","KL","Surprisal", "No Learning", "No Noise"),
+  label = c("EIG","KL","Surprisal", "No Learning", "No Noise"), 
+  x = c(9, 9, 9, 9, 9), 
+  y = c(1, 1, 1, 0.2, 0.25),
+) %>% mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) 
+
+no_lim_free_scale_p <- bind_rows(scaled_adult_resnet50_eig %>% mutate(type = "EIG"),
+          scaled_adult_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_adult_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_adult_resnet50_nonoise %>% mutate(type = "No Noise"), 
+          scaled_adult_resnet50_nolearning %>% mutate(type = "No Learning")) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot() +
+  geom_text(data = facet_labels, aes(x = 0, y = -Inf, label = label),hjust   = -1,
+  vjust   = -1) + 
+  theme_few() +
+  stat_summary(aes(x = trial_number, y = log(mean_sample), color = trial_type), fun.data = "mean_cl_boot") + 
+  stat_summary(aes(x = trial_number, y = log(mean_sample), color = trial_type), fun.data = "mean_cl_boot", geom = "line") + 
+  facet_wrap(~type,scales = "free_y") + 
+  theme(
+    legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+    legend.background = element_rect(fill = "white", colour = NA) 
+  ) + 
+  ylab("") + 
+  xlab("") + 
+  guides(color=guide_legend(title="Trial Type")) + 
+  ggthemes::scale_color_solarized(name = "Trial type") + 
+  theme(
+  strip.background = element_blank(),
+  strip.text.x = element_blank()
+)
+```
+
+## infant simulation
+
+```{r}
+infant_set_lim_fixed_scale_p <- bind_rows(scaled_infant_resnet50_eig %>% mutate(type = "EIG"), 
+          scaled_infant_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_infant_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_infant_resnet50_nolearning%>% mutate(type = "No Noise"), 
+          scaled_infant_resnet50_nonoise %>% mutate(type = "No Learning")) %>%
+  mutate(test_type = if_else(test_type == "fam", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot(aes(x = trial_number, y = scaled_samples, color = test_type, group = test_type)) + 
+  theme_few() +
+  stat_summary(fun.data = "mean_cl_boot") + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line") + 
+  ylim(0, 25) + 
+  facet_wrap(~type) + 
+  theme(
+  legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+  legend.background = element_rect(fill = "white", colour = NA) 
+) + 
+  ylab("") + 
+  xlab("") + 
+  ggthemes::scale_color_solarized(name = "Trial type")
+```
+
+
+```{r}
+infant_set_lim_free_scale_p <- bind_rows(scaled_infant_resnet50_eig %>% mutate(type = "EIG"), 
+          scaled_infant_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_infant_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_infant_resnet50_nolearning%>% mutate(type = "No Noise"), 
+          scaled_infant_resnet50_nonoise %>% mutate(type = "No Learning")) %>%
+  mutate(test_type = if_else(test_type == "fam", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot(aes(x = trial_number, y = scaled_samples, color = test_type, group = test_type)) + 
+  theme_few() +
+  stat_summary(fun.data = "mean_cl_boot") + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line") + 
+  ylim(0, 25) + 
+  facet_wrap(~type, scales = "free_y") + 
+  theme(
+  legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+  legend.background = element_rect(fill = "white", colour = NA) 
+) + 
+  ylab("") + 
+  xlab("") + 
+  ggthemes::scale_color_solarized(name = "Trial type")
+```
+
+```{r}
+infant_no_lim_free_scale_p <- bind_rows(scaled_infant_resnet50_eig %>% mutate(type = "EIG"), 
+          scaled_infant_resnet50_kl %>% mutate(type = "KL"), 
+          scaled_infant_resnet50_surprisal %>% mutate(type = "Surprisal"), 
+          scaled_infant_resnet50_nolearning%>% mutate(type = "No Noise"), 
+          scaled_infant_resnet50_nonoise %>% mutate(type = "No Learning")) %>%
+  mutate(test_type = if_else(test_type == "fam", "Familiar", "Novel")) %>% 
+  mutate(across(type, ~factor(., levels=c("EIG","KL","Surprisal", "No Learning", "No Noise")))) %>% 
+  ggplot(aes(x = trial_number, y = scaled_samples, color = test_type, group = test_type)) + 
+  theme_few() +
+  stat_summary(fun.data = "mean_cl_boot") + 
+  stat_summary(fun.data = "mean_cl_boot", geom = "line") + 
+  facet_wrap(~type, scales = "free_y") + 
+  theme(
+  legend.position = c(0.85, 0.25), # c(0,0) bottom left, c(1,1) top-right.
+  legend.background = element_rect(fill = "white", colour = NA) 
+) + 
+  ylab("") + 
+  xlab("") + 
+  ggthemes::scale_color_solarized(name = "Trial type")
+```
+
+
+# Put everything together 
+
+## adult
+
+```{r fig.width=10, fig.height=6}
+library(cowplot)
+plot_grid(adult_bp, set_lim_fixed_scale_p, rel_widths = c(2, 3))
+```
+```{r fig.width=10, fig.height=6}
+plot_grid(infant_bp, infant_no_lim_free_scale_p, rel_widths = c(2, 3))
+
+```
+

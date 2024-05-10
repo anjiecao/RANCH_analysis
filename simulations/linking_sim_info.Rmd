@@ -26,6 +26,9 @@ unlinked_resnet50_nonoise <- read_csv(here(unlinked_sim_folder_path, "unlinked_r
 unlinked_resnet50_kl <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_kl.csv"))
 unlinked_resnet50_surprisal <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_surprisal.csv"))
 unlinked_resnet50_surprisal_missing <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surprisal_missingparams.csv"))
+unlinked_resnet50_surprisal_missing_b <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surpirsal_missingparams_b.csv"))
+unlinked_resnet50_surprisal_missing_c <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surpirsal_missingparams_c.csv"))
+unlinked_resnet50_surprisal_missing_d <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surpirsal_missingparams_d.csv"))
 
 
 unlinked_param_info_resnet50_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_eig.csv"))
@@ -57,6 +60,15 @@ linked_resnet50_surprisal <- connect_files(trial_info = trial_info,
 linked_resnet50_surprisal_missing <- connect_files(trial_info = trial_info, 
                                     param_info = unlinked_param_info_resnet50_surprisal, 
                                     sim_data = unlinked_resnet50_surprisal_missing)
+linked_resnet50_surprisal_missing_b <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_resnet50_surprisal, 
+                                    sim_data = unlinked_resnet50_surprisal_missing_b)
+linked_resnet50_surprisal_missing_c <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_resnet50_surprisal, 
+                                    sim_data = unlinked_resnet50_surprisal_missing_c)
+linked_resnet50_surprisal_missing_d <- connect_files(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_resnet50_surprisal, 
+                                    sim_data = unlinked_resnet50_surprisal_missing_d)
 
 
 
@@ -68,13 +80,19 @@ write_csv(linked_resnet50_nonoise, here(linked_folder_path, "linked_resnet50_non
 write_csv(linked_resnet50_kl, here(linked_folder_path, "linked_resnet50_kl.csv"))
 write_csv(linked_resnet50_surprisal, here(linked_folder_path, "linked_resnet50_surprisal.csv"))
 write_csv(linked_resnet50_surprisal_missing, here(linked_folder_path, "linked_resnet50_surprisal_missing.csv"))
+write_csv(linked_resnet50_surprisal_missing_b, here(linked_folder_path, "linked_resnet50_surprisal_missing_b.csv"))
+write_csv(linked_resnet50_surprisal_missing_c, here(linked_folder_path, "linked_resnet50_surprisal_missing_c.csv"))
+write_csv(linked_resnet50_surprisal_missing_d, here(linked_folder_path, "linked_resnet50_surprisal_missing_d.csv"))
+
+
 
 ```
 
 ## sanity check
 
 ```{r}
-linked_resnet50_eig %>% 
+linked_resnet50_surprisal_missing_d %>% 
+  filter(!is.na(trial_number)) %>% 
   ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2))+ 
   theme_few()
