@@ -82,11 +82,33 @@ NL_params = NL_fit %>% arrange(rmse) %>% first() %>% select(p_a, p_i, rmse)
 param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_eig.csv"))
 fit_df = EIG_fit %>% rename(param_id = p_i) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
 
+# EIG fit
+param_info %>% filter(param_id == EIG_params$p_i) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'infants') %>% bind_rows(param_info %>% filter(param_id == EIG_params$p_a) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'adults'))
+
+# KL fit
+param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_KL.csv"))
+param_info %>% filter(param_id == KL_params$p_i) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'infants') %>% bind_rows(param_info %>% filter(param_id == KL_params$p_a) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'adults'))
+
+# surprisal fit
+param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_surprisal.csv"))
+param_info %>% filter(param_id == surprisal_params$p_i) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'infants') %>% bind_rows(param_info %>% filter(param_id == surprisal_params$p_a) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'adults'))
+
+fit_df = KL_fit %>% rename(param_id = p_i) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
+
+
 ggplot(fit_df, aes(x = rmse, fill = sd_epsilon)) + geom_histogram()
 
 
 
 ```
+
+# Developmental comparison
+
+```{r}
+
+
+```
+
 
 # Replot model predictions
 ```{r}
