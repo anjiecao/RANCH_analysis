@@ -1,0 +1,83 @@
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(psych)
+
+ d <- read_csv(here("misc_data/runbyrun.csv"))
+ 
+ d %>% 
+   group_by(param_id) %>% 
+   nest()
+```
+
+
+
+
+```{r}
+nested_d <- d %>% group_by(
+  param_id, batch_id
+) %>% 
+  nest() %>% 
+  mutate(data = map(data, . %>% 
+                      group_by(trial_id) %>% 
+                      mutate(individual_run_id  = row_number()) %>%
+                      ungroup() %>% 
+                      select(-index, -stim_id) %>%
+                      ungroup() %>% pivot_wider(names_from = individual_run_id, values_from = sample_n))) 
+```
+
+```{r}
+all_icc_info <- lapply(seq(1, nrow(nested_d)), 
+       function(id){
+         print(id)
+         data = nested_d$data[[id]]
+         # many runs have missing trial_id
+         if(nrow(data) >  1){
+           return((ICC(data[, 2:ncol(data)])$results) %>% mutate(id = id))
+         }
+         
+       }) %>% 
+  bind_rows()
+```
+
+```{r}
+nested_id <- nested_d %>% ungroup() %>% mutate(id = row_number())
+```
+
+```{r}
+all_icc_info %>% 
+  filter(type == "ICC2k") %>% 
+  left_join(nested_id %>% select(batch_id, param_id, id), by = c("id")) %>% 
+  ggplot(aes(x = ICC)) + 
+  facet_wrap(~param_id) +
+  geom_histogram()
+```
+
+```{r}
+wide_d[, 1:ncol(wide_d)]
+```
+
+
+```{r}
+
+nested_d %>% 
+  filter(batch_id == 120, param_id == 140) %>% 
+  pull(data)
+# within each batch 
+ICC(wide_d[, 2:ncol(wide_d)])
+```
+
+
+
+```{r}
+
+
+ d %>% filter(param_id == 144) %>% 
+  group_by(batch_id, param_id, trial_id) %>% 
+  mutate(unique_id = paste(batch_id, param_id, trial_id, row_number(), sep = "_")) %>% 
+  select(unique_id, sample_n, batch_id, trial_id) %>% 
+  pivot_wider(names_from = trial_id, values_from = sample_n, id_cols = c("batch_id", "unique_id"))
+```
+

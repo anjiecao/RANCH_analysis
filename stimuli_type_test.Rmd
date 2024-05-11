@@ -1,0 +1,109 @@
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+
+d <- read_csv(here("stim_type_test.csv"))
+scaled_d <- read_csv(here("scaled_down_stim.csv"))
+scaled_rep_d <- read_csv(here("misc_data/stim_type_replicate.csv"))
+```
+
+# unscaled stimuli
+one stimuli pair per category, each pair runs 200 times
+
+```{r}
+d %>% 
+  filter(`...1` == 5) %>% 
+  ggplot(aes(x = v_type, y = sample_n)) + 
+  #geom_point(position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  theme_few()
+```
+# scaled
+
+one stimuli pair per category, each pair runs 200 times
+
+```{r}
+scaled_d %>% 
+  filter(`...1` == 5) %>% 
+  ggplot(aes(x = v_type, y = sample_n)) + 
+  #geom_point(position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  theme_few()
+```
+
+these are teh
+
+print(identity_fam, identity_test)
+print(num_fam, num_test)
+print(pose_fam, pose_test)
+print(animacy_fam, animacy_test)
+
+```{r}
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+background_b <- c(0.4533, -0.9634, -0.7922)
+background_d <- c( 0.4533, -0.9634, -0.7922)
+
+identity_b <- c(  0.8621, -0.0764,  0.2498)
+identity_d <- c(1.5216,  0.1411, -0.1434)
+
+number_b <- c( -0.3219,  0.8121,  0.7056)
+number_d <- c(-0.5816,  1.4219,  0.2670)
+
+pose_b <- c(  1.8067, -0.2556, -0.6386)
+pose_d <- c(1.6578, -0.1109, -0.7233)
+
+animacy_b <- c(-1.3875, -1.4487,  0.0324)
+animacy_d <- c( 1.8204, -0.4493, -0.0524)
+
+eulidean_distance_df <- tibble(
+  background_dist = euclidean(background_b, background_d), 
+  identity_dist = euclidean(identity_b, identity_d), 
+  number_dist = euclidean(number_b, number_d),
+  pose_dist = euclidean(pose_b, pose_d), 
+  animacy_dist = euclidean(animacy_b, animacy_d), 
+  type = "euclidean"
+)
+
+sum_distance_df <- tibble(
+  background_dist = sum(abs(background_b- background_d)),
+  identity_dist = sum(abs(identity_b- identity_d)),
+  number_dist = sum(abs(number_b- number_d)),
+  pose_dist =  sum(abs(pose_b- pose_d)),
+  animacy_dist =  sum(abs(animacy_b- animacy_d)),
+  type = "sum"
+)
+
+bind_rows(
+   eulidean_distance_df, 
+   sum_distance_df
+   
+)
+
+```
+
+
+```{r}
+unscaled_embedding_range <- read_csv("/Users/caoanjie/Desktop/projects/RANCH/RANCH_cluster/sim_info/embeddings/resnet_pa.csv", col_names = FALSE) %>% 
+  summarise(d1_max = max(X2), 
+         d1_min = min(X2), 
+         d2_max = max(X3), 
+         d2_min = min(X3), 
+         d3_max = max(X4), 
+         d3_min = min(X4))
+
+#embedding_range 
+#grid_range
+grid_range <- tibble(
+  grid_max = -4,
+  grid_min = 4
+)
+
+#embedding_interval (to what extent the eucledian distance matters? )
+read_csv("/Users/caoanjie/Desktop/projects/RANCH/RANCH_cluster/sim_info/embeddings/resnet_pa.csv", col_names = FALSE)
+
+#grid_interval
+```
+
