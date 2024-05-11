@@ -238,20 +238,18 @@ stim_df_with_dist %>%
 # Infant linking
 
 ```{r}
-linked_folder_path <- "simulations/sim_infant_exposure_duration/01_linked_sim"
-trial_info_folder_path <- "simulations/sim_infant_exposure_duration"
-unlinked_sim_folder_path <- "simulations/sim_infant_exposure_duration/00_raw_sim"
-unlinked_param_info_folder_path <- "simulations/sim_infant_exposure_duration/param_info"
+linked_folder_path <- "simulations/sim_infant_stimulus_type/01_linked_sim"
+trial_info_folder_path <- "simulations/sim_infant_stimulus_type"
+unlinked_sim_folder_path <- "simulations/sim_infant_stimulus_type/00_raw_sim"
+unlinked_param_info_folder_path <- "simulations/sim_infant_stimulus_type/param_info"
 
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
-unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "unlinked_resnet50_nonoise.csv"))
-unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_no_noise.csv"))
+unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "generalization_downscaled.csv")) 
+unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_eig.csv"))
 
+linked_aligned_eig <- connect_files_stim_type(trial_info = trial_info, 
+                                    param_info = unlinked_param_info_aligned_eig, sim_data = unlinked_aligned_eig)
 
-linked_aligned_eig <- connect_files(trial_info = trial_info, 
-                                    param_info = unlinked_param_info_aligned_eig, 
-                                    sim_data = unlinked_aligned_eig)
-
-write_csv(linked_aligned_eig, here(linked_folder_path, "linked_resnet50_nonoise.csv"))
+write_csv(linked_aligned_eig, here(linked_folder_path, "linked_generalization.csv"))
 
 ```

@@ -1,0 +1,17 @@
+```{r}
+library(tidyverse)
+library(here)
+library(colf)
+library(ggthemes)
+
+```
+
+# Load data
+```{r}
+
+infant_sims = read_csv(here('simulations/sim_infant_stimulus_type/generalization_infants.csv')) 
+adult_sims = read_csv(here('simulations/sim_infant_stimulus_type/generalization_adults.csv')) 
+
+trial_info = read_csv()
+
+```
