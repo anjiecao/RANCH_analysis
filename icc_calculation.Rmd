@@ -5,58 +5,105 @@ library(tidyverse)
 library(here)
 library(psych)
 
- d <- read_csv(here("misc_data/runbyrun.csv"))
- 
- d %>% 
-   group_by(param_id) %>% 
-   nest()
+surprisal_d <- read_csv(here("misc_data/runbyrun.csv"))
+eig_d <- read_csv(here(here("misc_data/runbyrun_eig.csv")))
 ```
 
 
 
 
 ```{r}
-nested_d <- d %>% group_by(
-  param_id, batch_id
+nested_surprisal_d <- surprisal_d %>% group_by(
+  param_id, 
+  #batch_id
 ) %>% 
   nest() %>% 
   mutate(data = map(data, . %>% 
                       group_by(trial_id) %>% 
                       mutate(individual_run_id  = row_number()) %>%
                       ungroup() %>% 
-                      select(-index, -stim_id) %>%
+                      select(-index, -stim_id, -batch_id) %>%
+                      ungroup() %>% pivot_wider(names_from = individual_run_id, values_from = sample_n))) 
+
+nested_eig_d <- eig_d %>%
+  rename(sample_n = `sample+n`) %>% 
+  group_by(
+  param_id, 
+  #batch_id
+) %>% 
+  nest() %>% 
+  mutate(data = map(data, . %>% 
+                      group_by(trial_id) %>% 
+                      mutate(individual_run_id  = row_number()) %>%
+                      ungroup() %>% 
+                      select(-index, -stim_id, -batch_id) %>%
                       ungroup() %>% pivot_wider(names_from = individual_run_id, values_from = sample_n))) 
 ```
 
 ```{r}
-all_icc_info <- lapply(seq(1, nrow(nested_d)), 
+all_surprisal_icc_info <- lapply(seq(1, nrow(nested_surprisal_d)), 
        function(id){
          print(id)
-         data = nested_d$data[[id]]
+         data = nested_surprisal_d$data[[id]]
          # many runs have missing trial_id
          if(nrow(data) >  1){
            return((ICC(data[, 2:ncol(data)])$results) %>% mutate(id = id))
          }
          
        }) %>% 
-  bind_rows()
+  bind_rows() %>% 
+  mutate(sim_type = "surprisal")
+
+all_eig_icc_info <- lapply(seq(1, nrow(nested_eig_d)), 
+       function(id){
+         print(id)
+         data = nested_surprisal_d$data[[id]]
+         # many runs have missing trial_id
+         if(nrow(data) >  1){
+           return((ICC(data[, 2:ncol(data)])$results) %>% mutate(id = id))
+         }
+         
+       }) %>% 
+  bind_rows() %>% 
+  mutate(sim_type = "eig")
 ```
 
 ```{r}
-nested_id <- nested_d %>% ungroup() %>% mutate(id = row_number())
+nested_surprisal_id <- nested_surprisal_d %>% ungroup() %>% mutate(id = row_number())
+nested_eig_id <- nested_eig_d %>% ungroup() %>% mutate(id = row_number())
+
 ```
 
 ```{r}
-all_icc_info %>% 
+all_surprisal_icc_info %>% 
   filter(type == "ICC2k") %>% 
-  left_join(nested_id %>% select(batch_id, param_id, id), by = c("id")) %>% 
+  left_join(nested_surprisal_id %>% select(batch_id, param_id, id), by = c("id")) %>% 
+  ggplot(aes(x = ICC)) + 
+  facet_wrap(~param_id) +
+  geom_histogram()
+
+all_eig_icc_info %>% 
+  filter(type == "ICC2k") %>% 
+  left_join(nested_eig_id %>% select(batch_id, param_id, id), by = c("id")) %>% 
   ggplot(aes(x = ICC)) + 
   facet_wrap(~param_id) +
   geom_histogram()
 ```
 
 ```{r}
-wide_d[, 1:ncol(wide_d)]
+
+all_surprisal_icc_info %>% 
+  filter(type == "ICC2k") %>% 
+  left_join(nested_surprisal_id %>% select(param_id, id), by = c("id")) %>% 
+  bind_rows(
+    all_eig_icc_info %>% 
+  filter(type == "ICC2k") %>% 
+  left_join(nested_eig_id %>% select(param_id, id), by = c("id"))
+  ) %>% 
+  ggplot(aes(x = as.factor(param_id), y = ICC, color = sim_type)) + 
+  geom_point(alpha = .1, position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = .2)) 
+  #facet_wrap(~sim_type, scale = "free_x")
 ```
 
 

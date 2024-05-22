@@ -4,9 +4,17 @@ library(tidyverse)
 library(here)
 library(ggthemes)
 
-d <- read_csv(here("stim_type_test.csv"))
-scaled_d <- read_csv(here("scaled_down_stim.csv"))
-scaled_rep_d <- read_csv(here("misc_data/stim_type_replicate.csv"))
+#d <- read_csv(here("misc_data/stim_type_test.csv"))
+scaled_d <- read_csv(here("misc_data/stim_type_rescaled.csv"))
+scaled_d_fixed_animacy <- read_csv(here("misc_data/stim_type_fixanimacy.csv"))
+scaled_d_fixed_schema_order <- read_csv(here("misc_data/stim_type_schema_order.csv"))
+scaled_d_fixed_schema_unscaled <- read_csv(here("misc_data/stim_type_schema_order_unscaled.csv"))
+
+
+cluster_scaled_d <- read_csv(here("misc_data/stim_type_replicate_cluster_smaller_distances.csv"))
+
+#scaled_rep_d <- read_csv(here("misc_data/stim_type_replicate.csv"))
+#scaled_rep_cluster_d <-  read_csv(here("misc_data/stim_type_replicate_cluster.csv"))
 ```
 
 # unscaled stimuli
@@ -25,7 +33,7 @@ d %>%
 one stimuli pair per category, each pair runs 200 times
 
 ```{r}
-scaled_d %>% 
+scaled_d_fixed_schema_unscaled %>% 
   filter(`...1` == 5) %>% 
   ggplot(aes(x = v_type, y = sample_n)) + 
   #geom_point(position = position_jitter(width = .2)) + 
@@ -33,12 +41,38 @@ scaled_d %>%
   theme_few()
 ```
 
+```{r}
+cluster_scaled_d %>% 
+  filter(`...1` == 5) %>% 
+  ggplot(aes(x = v_type, y = sample_n)) + 
+  #geom_point(position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  theme_few() + 
+  labs(title = "cluster run")
+```
+
+# scaled same parametrs
+
+```{r}
+scaled_d_fixed_animacy %>% 
+  filter(`...1` == 5) %>% 
+  ggplot(aes(x = v_type, y = sample_n)) + 
+  #geom_point(position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  theme_few() + 
+  labs(title = "local run")
+```
+
+
+
 these are teh
 
 print(identity_fam, identity_test)
 print(num_fam, num_test)
 print(pose_fam, pose_test)
 print(animacy_fam, animacy_test)
+
+# unscaled embedding distance
 
 ```{r}
 euclidean <- function(a, b) sqrt(sum((a - b)^2))
@@ -56,7 +90,8 @@ pose_b <- c(  1.8067, -0.2556, -0.6386)
 pose_d <- c(1.6578, -0.1109, -0.7233)
 
 animacy_b <- c(-1.3875, -1.4487,  0.0324)
-animacy_d <- c( 1.8204, -0.4493, -0.0524)
+#animacy_d <- c( 1.8204, -0.4493, -0.0524)
+animacy_d <- c(  -0.4204, -1.4493, -0.0524)
 
 eulidean_distance_df <- tibble(
   background_dist = euclidean(background_b, background_d), 
@@ -83,6 +118,158 @@ bind_rows(
 )
 
 ```
+# scaled embedding distance
+
+tensor([ 0.3558, -0.0828,  0.2068], dtype=torch.float64) tensor([ 0.3247, -0.0240,  0.2319], dtype=torch.float64)
+tensor([ 0.2160, -0.0835,  0.0766], dtype=torch.float64) tensor([-0.1296, -0.0598,  0.0950], dtype=torch.float64)
+
+```{r}
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+background_b <- c(-0.1407, -0.0929, -0.0746)
+background_d <- c(-0.1407, -0.0929, -0.0746)
+
+identity_b <- c(  0.2464,  0.2169, -0.1249)
+identity_d <- c(0.2103,  0.1390, -0.1686)
+
+number_b <- c( 0.1501,  0.1735, -0.0784)
+number_d <- c( 0.1305,  0.0343, -0.1756)
+
+pose_b <- c(  0.3558, -0.0828,  0.2068)
+pose_d <- c( 0.3247, -0.0240,  0.2319)
+
+animacy_b <- c( 0.2160, -0.0835,  0.0766)
+#animacy_d <- c(  -0.1296, -0.0598,  0.0950)
+animacy_d <- c(  0.1096, -0.0598,  0.0950)
+
+eulidean_distance_df <- tibble(
+  background_dist = euclidean(background_b, background_d), 
+  identity_dist = euclidean(identity_b, identity_d), 
+  number_dist = euclidean(number_b, number_d),
+  pose_dist = euclidean(pose_b, pose_d), 
+  animacy_dist = euclidean(animacy_b, animacy_d), 
+  type = "euclidean"
+)
+
+sum_distance_df <- tibble(
+  background_dist = sum(abs(background_b- background_d)),
+  identity_dist = sum(abs(identity_b- identity_d)),
+  number_dist = sum(abs(number_b- number_d)),
+  pose_dist =  sum(abs(pose_b- pose_d)),
+  animacy_dist =  sum(abs(animacy_b- animacy_d)),
+  type = "sum"
+)
+
+bind_rows(
+   eulidean_distance_df, 
+   sum_distance_df
+   
+)
+```
+
+# artificial ones?!?
+
+```{r}
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+background_b <- c(-0.1, -0.1, -0.1)
+background_d <- c(-0.1, -0.1, -0.1)
+
+identity_b <- c(-0.1, -0.1, -0.1)
+identity_d <- c(0.2, 0.2, 0.2)
+
+number_b <-  c(-0.1, -0.1, -0.1)
+number_d <-  c(0.1, 0.1, 0.1)
+
+pose_b <- c(-0.1, -0.1, -0.1)
+pose_d <- c(0, 0, 0)
+
+animacy_b <- c(-0.1, -0.1, -0.1)
+#animacy_d <- c(  -0.1296, -0.0598,  0.0950)
+animacy_d <- c(  0.3, 0.3,  0.3)
+
+eulidean_distance_df <- tibble(
+  background_dist = euclidean(background_b, background_d), 
+  identity_dist = euclidean(identity_b, identity_d), 
+  number_dist = euclidean(number_b, number_d),
+  pose_dist = euclidean(pose_b, pose_d), 
+  animacy_dist = euclidean(animacy_b, animacy_d), 
+  type = "euclidean"
+)
+
+sum_distance_df <- tibble(
+  background_dist = sum(abs(background_b- background_d)),
+  identity_dist = sum(abs(identity_b- identity_d)),
+  number_dist = sum(abs(number_b- number_d)),
+  pose_dist =  sum(abs(pose_b- pose_d)),
+  animacy_dist =  sum(abs(animacy_b- animacy_d)),
+  type = "sum"
+)
+
+bind_rows(
+   eulidean_distance_df, 
+   sum_distance_df
+   
+)
+```
+
+# unscaled shcematic 
+
+```{r}
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+background_b <- c(-1, -1, -1)
+background_d <- c(-1, -1, -1)
+
+identity_b <- c(-1, -1, -1)
+identity_d <- c(2, 2, 2)
+
+number_b <-  c(-1, -1, -1)
+number_d <-  c(1, 1, 1)
+
+pose_b <- c(-1, -1, -1)
+pose_d <- c(0, 0, 0)
+
+animacy_b <- c(-1, -1, -1)
+#animacy_d <- c(  -0.1296, -0.0598,  0.0950)
+animacy_d <- c( 3, 3, 3)
+
+eulidean_distance_df <- tibble(
+  background_dist = euclidean(background_b, background_d), 
+  identity_dist = euclidean(identity_b, identity_d), 
+  number_dist = euclidean(number_b, number_d),
+  pose_dist = euclidean(pose_b, pose_d), 
+  animacy_dist = euclidean(animacy_b, animacy_d), 
+  type = "euclidean"
+)
+
+sum_distance_df <- tibble(
+  background_dist = sum(abs(background_b- background_d)),
+  identity_dist = sum(abs(identity_b- identity_d)),
+  number_dist = sum(abs(number_b- number_d)),
+  pose_dist =  sum(abs(pose_b- pose_d)),
+  animacy_dist =  sum(abs(animacy_b- animacy_d)),
+  type = "sum"
+)
+
+bind_rows(
+   eulidean_distance_df, 
+   sum_distance_df
+   
+)
+```
+
+## from cluster run? 
+
+```{r}
+scaled_rep_cluster_d %>% 
+   filter(`...1` == 5) %>% 
+  ggplot(aes(x = v_type, y = sample_n)) + 
+  #geom_point(position = position_jitter(width = .2)) + 
+  stat_summary(fun.data = "mean_cl_boot") + 
+  theme_few()
+```
+
 
 
 ```{r}
