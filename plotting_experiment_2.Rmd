@@ -1,0 +1,42 @@
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+
+adult_stype <- read_csv(here("adults/adult_stimuli_type.csv"))
+adult_stype_simulation <- readRDS(here("cached_data/scaled_adults_stim_type.Rds"))
+```
+
+```{r}
+
+
+adult_stype_simulation %>% 
+  select(trial_type, trial_number, mean_lt, lb_lt, ub_lt, scaled_samples, scaled_ub_sample, scaled_lb_sample) %>% 
+  pivot_longer(cols = c("mean_lt", "lb_lt", "ub_lt", 
+                        "scaled_samples", "scaled_ub_sample", "scaled_lb_sample")) %>% 
+  mutate(value_type = case_when(
+    grepl("lt", name) ~ "Adult Behavior", 
+    grepl("scaled", name) ~ "RANCH"
+  )) %>% 
+  mutate(
+    new_name = case_when(
+      name == "mean_lt" ~ "LT", 
+      name == "scaled_samples" ~ "LT", 
+      name == "scaled_ub_sample" ~ "ub_lt", 
+      name == "scaled_lb_sample" ~ "lb_lt", 
+      TRUE ~ name
+    )
+  ) %>% 
+  select(-name) %>% 
+  pivot_wider(names_from = new_name, values_from = value) %>% 
+  ggplot(aes(x = trial_number, y = LT/1000, ymin = lb_lt/1000, ymax = ub_lt/1000, color = trial_type)) + 
+  geom_pointrange(position = position_dodge(width = .2)) +
+  geom_line(position = position_dodge(width = .2))+
+  facet_wrap(~value_type) + 
+  theme_few() + 
+  ylab("Looking time (sec) / Samples") + 
+  xlab("Trial number")
+
+```
+

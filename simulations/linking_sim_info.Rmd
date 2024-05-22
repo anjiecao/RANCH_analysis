@@ -88,6 +88,38 @@ write_csv(linked_resnet50_surprisal_missing_d, here(linked_folder_path, "linked_
 
 ```
 
+# sim_adult_stimulus_type 
+
+```{r}
+unlinked_adult_stimulus_type <- read_csv(here("simulations/sim_adult_stimulus_type/00_raw_sim/generalization_downscaled.csv"))
+stimulus_type_trial_info <- read_csv(here("simulations/sim_adult_stimulus_type/trial_info.csv"))
+
+linked_adult_stimulus_type <- stimulus_type_trial_info %>% 
+    distinct(trial_id, stim_id, fam_duration, violation_type) %>% 
+    right_join(unlinked_adult_stimulus_type, by = c("trial_id", "stim_id")) %>% 
+    select(param_id, index, fam_duration, violation_type, sample_n_mean, sample_n_std) %>%
+    mutate(trial_type = case_when(
+      index == fam_duration ~ violation_type,
+      TRUE ~ "fam" )) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "fam", trial_type)) %>% 
+    mutate(trial_number = index + 1) %>% 
+    group_by(param_id, trial_type, trial_number) %>% 
+    summarise(
+      count = n(),
+      #ssd = sum((20-1) * (sample_n_std ** 2)),
+      #sd_sample = (ssd / 20 * count - count) ** .5, 
+      sd_sample = pooled_sd(sample_n_std, 20),
+      mean_sample = mean(sample_n_mean), 
+      ub_sample = mean_sample + 1.96 * (sd_sample /((400 * count) ** .5)),
+      lb_sample = mean_sample - 1.96 * (sd_sample /((400 * count) ** .5)),) %>% # missing SD here!
+    ungroup() 
+ 
+linked_adult_stimulus_type %>% write_csv(here("simulations/sim_adult_stimulus_type/01_linked_sim/linked_adult_stimulus_type.csv"))
+
+```
+
+
+
 ## sanity check
 
 ```{r}

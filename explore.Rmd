@@ -10,7 +10,16 @@ library(Metrics)
 source(here("helper/run_k_fold.R"))
 
 adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
+adult_stype <- read_csv(here("adults/adult_stimuli_type.csv"))
+```
 
+
+
+# Exposure duration 
+
+## Connecting simulation files
+
+```{r}
 adult_aligned_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_aligned_eig.csv"))
 adult_resnet50_eig <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_eig.csv"))
 adult_resnet50_nonoise <- read_csv(here("simulations/sim_adult_exposure_duration/01_linked_sim/linked_resnet50_nonoise.csv"))
@@ -27,28 +36,7 @@ adult_resnet50_surprisal_missing_d <- read_csv(here("simulations/sim_adult_expos
 ```
 
 
-```{r fig.width=8, fig.height=8}
-adult_resnet50_surprisal_missing_c %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "4th") %>% 
-  bind_rows(
-    adult_resnet50_surprisal_missing_b %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "3rd"),
-    adult_resnet50_surprisal_missing %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "2nd"),
-        adult_resnet50_surprisal %>% filter(param_id %in% (adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)))$param_id) %>% mutate(run_id = "1st"),
-    adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)) %>% mutate(run_id = "5th")
-  ) %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
-  geom_point() + 
-  facet_grid(run_id~param_id, scales = "free_y") + 
-  scale_x_continuous(breaks = seq(1, 10))
-
-
-
-adult_resnet50_surprisal_missing_d %>% filter(!is.na(trial_number)) %>% 
-  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
-  geom_point() + 
-  facet_wrap(~param_id, scales = "free_y") + 
-  scale_x_continuous(breaks = seq(1, 10))
-```
-
+## K-fold results 
 
 ```{r}
 adult_kfold_aligned_eig = run_all_kfold(sim_data = adult_aligned_eig, behavioral_data = adult_bd)
@@ -98,23 +86,7 @@ saveRDS(current_adult_kfold_resnet50_surprisal, here("cached_data/adult_kfold_re
 
 
 
-```{r}
-
-adult_kfold_aligned_eig <- readRDS(here("cached_data/adult_kfold_resnet50_eig.Rds"))
-adult_kfold_resnet50_kl <- readRDS(here("cached_data/adult_kfold_resnet50_kl.Rds"))
-adult_kfold_resnet50_surprisal <- current_adult_kfold_resnet50_surprisal
-
-bind_rows(adult_kfold_aligned_eig %>% mutate(type = "EIG"), 
-          adult_kfold_resnet50_kl %>% mutate(type = "KL"), 
-          adult_kfold_resnet50_surprisal %>% mutate(type = "Surprisal")
-          ) %>% 
-  ggplot(aes(x = mean_rmse)) + 
-  geom_histogram() + 
-  facet_wrap(~type) + 
-  theme_few()
-```
-
-
+## Full data results 
 
 ```{r}
 adult_fulldata_aligned_eig = run_all_full_data_fit(sim_data = adult_aligned_eig, behavioral_data = adult_bd)
@@ -139,6 +111,48 @@ saveRDS(adult_fulldata_resnet50_kl, here("cached_data/adult_fulldata_resnet50_kl
 saveRDS(adult_fulldata_resnet50_surprisal,  here("cached_data/adult_fulldata_resnet50_surprisal.Rds"))
 ```
 
+
+# Stimuli type experiment 
+
+```{r}
+adult_linked_generalization <- read_csv(here("simulations/sim_adult_stimulus_type/01_linked_sim/linked_adult_stimulus_type.csv"))
+
+
+adult_stype_behavior_data <- adult_stype %>% 
+  mutate(trial_type = case_when(
+      trial_type == "deviant" ~ violation_type,
+      TRUE ~ "fam" )) %>% 
+  mutate(trial_type = if_else(trial_type == "background", "fam", trial_type)) %>% 
+    group_by( trial_type, trial_number) %>% 
+    summarise(mean_lt = mean(total_rt), 
+              count = n(),
+              #ssd = sum((20-1) * (sample_n_std ** 2)),
+              #sd_sample = (ssd / 20 * count - count) ** .5, 
+              sd_lt = sd(total_rt),
+              ub_lt = mean_lt + 1.96 * (sd_lt /(count ** .5)),
+              lb_lt = mean_lt - 1.96 * (sd_lt /(count ** .5))) 
+  
+summarized_behavioral_experiment <- adult_stype
+
+
+data_to_fit <- adult_linked_generalization %>% 
+  left_join(adult_stype_behavior_data, by = c("trial_type", "trial_number"))
+
+
+fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = data_to_fit, lower = c(-Inf, 0.0000001))
+sample_slope = fitted_stats$coefficients["param_mean_sample"]
+sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+  
+scaled_data <- data_to_fit %>% 
+    mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept, 
+           scaled_ub_sample = ub_sample * sample_slope + sample_intercept, 
+           scaled_lb_sample = lb_sample * sample_slope + sample_intercept)
+
+scaled_data %>% saveRDS(here("cached_data/scaled_adults_stim_type.Rds"))
+  
+rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
+rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
+```
 
 
 # Try plotting 
