@@ -11,6 +11,7 @@ source(here("helper/run_k_fold.R"))
 
 adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
 adult_stype <- read_csv(here("adults/adult_stimuli_type.csv"))
+infant_stype <- read_csv(here("infants/data/infant_stim_type.csv"))
 ```
 
 
@@ -114,6 +115,8 @@ saveRDS(adult_fulldata_resnet50_surprisal,  here("cached_data/adult_fulldata_res
 
 # Stimuli type experiment 
 
+## scaling adults
+
 ```{r}
 adult_linked_generalization <- read_csv(here("simulations/sim_adult_stimulus_type/01_linked_sim/linked_adult_stimulus_type.csv"))
 
@@ -152,6 +155,67 @@ scaled_data %>% saveRDS(here("cached_data/scaled_adults_stim_type.Rds"))
   
 rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
 rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
+```
+
+
+## Scaling infants 
+
+```{r}
+infant_linked_generalization <- read_csv(here("simulations/sim_infant_stimulus_type/01_linked_sim/linked_generalization.csv"))
+
+infant_linked_generalization_summary <- adult_linked_generalization %>% 
+  group_by(trial_type) %>% 
+  summarise(mean_sample = mean(mean_sample), 
+              #ssd = sum((20-1) * (sample_n_std ** 2)),
+              #sd_sample = (ssd / 20 * count - count) ** .5, 
+              ub_sample = mean(ub_sample),
+              lb_sample = mean(lb_sample))
+
+infant_stype_summary <- infant_stype %>% 
+  filter(grepl("test", Trials.trialType)) %>% 
+  filter(Trials.excludeTrial == "FALSE") %>% 
+  mutate(trial_type = case_when(
+    grepl("background", Trials.trialType) ~ "fam", 
+    grepl("animacy", Trials.trialType) ~ "animacy", 
+    grepl("identity", Trials.trialType) ~ "identity", 
+    grepl("pose", Trials.trialType) ~ "pose", 
+    grepl("number", Trials.trialType) ~ "number" 
+  )) %>% 
+  mutate(
+    trial_number = case_when(
+      grepl("test-8", Trials.trialType) ~ 9, 
+      grepl("test-9", Trials.trialType) ~ 10, 
+    )
+  ) %>% 
+  rename(lt = Looks.duration_onLooks) %>% 
+  group_by(trial_type) %>% 
+  summarise(mean_lt = mean(lt), 
+            count = n(),
+              #ssd = sum((20-1) * (sample_n_std ** 2)),
+              #sd_sample = (ssd / 20 * count - count) ** .5, 
+              sd_lt = sd(lt),
+              ub_lt = mean_lt + 1.96 * (sd_lt /(count ** .5)),
+              lb_lt = mean_lt - 1.96 * (sd_lt /(count ** .5)))
+
+
+data_to_fit <- infant_linked_generalization_summary %>% 
+  left_join(infant_stype_summary, by = c("trial_type"))
+
+
+fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = data_to_fit, lower = c(-Inf, 0.0000001))
+sample_slope = fitted_stats$coefficients["param_mean_sample"]
+sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
+  
+scaled_data <- data_to_fit %>% 
+    mutate(scaled_samples = mean_sample * sample_slope  + sample_intercept, 
+           scaled_ub_sample = ub_sample * sample_slope + sample_intercept, 
+           scaled_lb_sample = lb_sample * sample_slope + sample_intercept)
+
+scaled_data %>% saveRDS(here("cached_data/scaled_infants_stim_type.Rds"))
+  
+rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
+rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
+
 ```
 
 
