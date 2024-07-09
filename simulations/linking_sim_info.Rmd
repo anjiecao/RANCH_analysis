@@ -277,3 +277,14 @@ write_csv(linked_aligned_eig, here(linked_folder_path, "linked_generalization.cs
 
 
 ```
+
+
+```{r}
+read_csv(here("simulations/sim_infant_stimulus_type/01_linked_sim/linked_generalization.csv")) %>% 
+  ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) + 
+  geom_point() + 
+  geom_line()+
+  theme_few()
+
+```
+
