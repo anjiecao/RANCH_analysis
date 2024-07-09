@@ -12,6 +12,9 @@ library(colf)
 library(ggthemes)
 library(Metrics)
 source(here("helper/joint_scaling.R"))
+source(here("helper/viz_fits.R"))
+source(here("helper/run_k_fold.R"))
+
 
 adult_bd <- read_csv(here("adults/adult_exposure_duration.csv"))
 infant_bd <- read_csv(here("infants/data/infant_exposure_duration.csv"))%>% filter(fam_or_test == 'test', !exclude)
@@ -93,12 +96,11 @@ param_info %>% filter(param_id == KL_params$p_i) %>% select(param_id, V_prior, a
 param_info <- read_csv(here("simulations/sim_adult_exposure_duration/param_info/param_info_resnet50_surprisal.csv"))
 param_info %>% filter(param_id == surprisal_params$p_i) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'infants') %>% bind_rows(param_info %>% filter(param_id == surprisal_params$p_a) %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs) %>% mutate(param_id = 'adults'))
 
-fit_df = KL_fit %>% rename(param_id = p_i) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
+write_csv(EIG_fit, 'joint_scaling_fits.csv')
 
+fit_df = EIG_fit %>% rename(param_id = p_a) %>% left_join(param_info %>% select(param_id, V_prior, alpha_prior, beta_prior, sd_epsilon, world_EIGs), by = "param_id" ) %>%  mutate(across(-c(rsquared,rmse), as.factor))
 
-ggplot(fit_df, aes(x = rmse, fill = sd_epsilon)) + geom_histogram()
-
-
+ggplot(fit_df, aes(x = rmse, fill = beta_prior)) + geom_histogram()
 
 ```
 

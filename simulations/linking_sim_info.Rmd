@@ -3,6 +3,7 @@ library(tidyverse)
 library(ggthemes)
 library(here)
 source(here("simulations/linking_sim_helper.R"))
+
 ```
 
 # sim_adult_exposure_duration
@@ -13,8 +14,6 @@ trial_info_folder_path <- "simulations/sim_adult_exposure_duration"
 unlinked_sim_folder_path <- "simulations/sim_adult_exposure_duration/00_raw_sim"
 unlinked_param_info_folder_path <- "simulations/sim_adult_exposure_duration/param_info"
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
-
-
 ```
 
 ```{r}
@@ -30,14 +29,11 @@ unlinked_resnet50_surprisal_missing_b <-read_csv(here(unlinked_sim_folder_path,"
 unlinked_resnet50_surprisal_missing_c <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surpirsal_missingparams_c.csv"))
 unlinked_resnet50_surprisal_missing_d <-read_csv(here(unlinked_sim_folder_path,"unlinked_resnet50_surpirsal_missingparams_d.csv"))
 
-
 unlinked_param_info_resnet50_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_eig.csv"))
 unlinked_param_info_resnet50_no_learning <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_no_learning.csv"))
 unlinked_param_info_resnet50_no_noise <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_no_noise.csv"))
 unlinked_param_info_resnet50_kl <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_kl.csv"))
 unlinked_param_info_resnet50_surprisal <- read_csv(here(unlinked_param_info_folder_path, "param_info_resnet50_surprisal.csv"))
-
-
 
 linked_aligned_eig <- connect_files(trial_info = trial_info, 
                                     param_info = unlinked_param_info_resnet50_eig, 
@@ -69,8 +65,6 @@ linked_resnet50_surprisal_missing_c <- connect_files(trial_info = trial_info,
 linked_resnet50_surprisal_missing_d <- connect_files(trial_info = trial_info, 
                                     param_info = unlinked_param_info_resnet50_surprisal, 
                                     sim_data = unlinked_resnet50_surprisal_missing_d)
-
-
 
 # write out the csv
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_aligned_eig.csv"))
@@ -169,9 +163,6 @@ ggplot(aes(x = trial_number, y = mean_sample, color = trial_type)) +
   theme_few()+ 
   facet_grid(param_id~type)
 ```
-
-
-
 
 
 relationship between embedding distance and dishabituation magnitude
@@ -277,11 +268,12 @@ unlinked_param_info_folder_path <- "simulations/sim_infant_stimulus_type/param_i
 
 trial_info <- read_csv(here(trial_info_folder_path, "trial_info.csv"))
 unlinked_aligned_eig <- read_csv(here(unlinked_sim_folder_path, "generalization_downscaled.csv")) 
-unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_eig.csv"))
+unlinked_param_info_aligned_eig <- read_csv(here(unlinked_param_info_folder_path, "param_info_eig.csv")) 
 
 linked_aligned_eig <- connect_files_stim_type(trial_info = trial_info, 
                                     param_info = unlinked_param_info_aligned_eig, sim_data = unlinked_aligned_eig)
 
 write_csv(linked_aligned_eig, here(linked_folder_path, "linked_generalization.csv"))
+
 
 ```

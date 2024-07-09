@@ -46,29 +46,37 @@ split_vector_into_chunks <- function(vec){
   return(chunks)
 }
 
-run_all_full_data_fit <- function(sim_data, behavioral_data){
+run_all_full_data_fit <- function(sim_data, behavioral_data, group = 'adults'){
   
-  full_data_fit_res <- lapply(
-    unique(sim_data$param_id), 
-    function(id){
-      run_full_data_fit(p_id = id, 
-                 raw_d = behavioral_data, 
-                 sd = sim_data)
-    }
-  ) %>% 
-    bind_rows()
-  
+    full_data_fit_res <- lapply(
+      unique(sim_data$param_id), 
+      function(id){
+        run_full_data_fit(p_id = id, 
+                          raw_d = behavioral_data, 
+                          sd = sim_data,
+                          group = group)
+      }
+    ) %>% 
+      bind_rows()
+
   return (full_data_fit_res)
   
 }
 
-
-run_full_data_fit <- function(p_id, raw_d, sd){
+run_full_data_fit <- function(p_id, raw_d, sd, group = 'adults'){
   
-  data_to_fit <- summarize_behavioral_data(raw_d) %>% 
-    ungroup() %>% 
-    left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) 
-  
+  if (group == "adults"){
+    data_to_fit <- summarize_behavioral_data(raw_d) %>% 
+      ungroup() %>% 
+      left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) 
+    
+  }
+  else {
+      data_to_fit <- summarize_behavioral_data_infants(raw_d) %>% 
+        ungroup() %>% 
+        left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("fam_duration", "test_type")) 
+    }
+ 
   fitted_stats = colf_nlxb(mean_lt ~ mean_sample, data = data_to_fit, lower = c(-Inf, 0.0000001))
   sample_slope = fitted_stats$coefficients["param_mean_sample"]
   sample_intercept = fitted_stats$coefficients["param_X.Intercept."]
@@ -79,7 +87,6 @@ run_full_data_fit <- function(p_id, raw_d, sd){
   rsquared <- cor(scaled_data$mean_lt, scaled_data$scaled_samples)^2
   rmse <- rmse(scaled_data$mean_lt, scaled_data$scaled_samples)
  
-  
   return(
     tibble(
       "param_id" = p_id, 
@@ -87,7 +94,6 @@ run_full_data_fit <- function(p_id, raw_d, sd){
       "mean_rmse" = rmse
     )
   )
-  
 }
 
 run_k_fold <- function(p_id, raw_d, sd){
@@ -153,10 +159,6 @@ run_k_fold <- function(p_id, raw_d, sd){
 
 
 link_dataset <- function(p_id, raw_d, sd){
-  
- 
-  
-  
 
   data = summarize_behavioral_data(raw_d) %>% ungroup() %>% left_join(sd %>% filter(param_id == p_id) %>% ungroup(), by = c("trial_number", "trial_type")) %>% 
     filter(trial_number != 11)

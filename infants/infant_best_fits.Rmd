@@ -25,6 +25,15 @@ resnet50_nonoise_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nonois
 resnet50_nolearning_CV = readRDS(here("cached_data/infant_splithalf_resnet50_nolearning.Rds")) %>% get_param_stats()
 linmodel_df = readRDS(here("cached_data/infant_splithalf_linmodel.Rds")) 
 
+# write CSV of CVs
+write_csv(aligned_EIG_CV, here("data_to_transfer/aligned_EIG_CV.csv"))
+write_csv(resnet50_EIG_CV, here("data_to_transfer/resnet50_EIG_CV.csv"))
+write_csv(resnet50_KL_CV, here("data_to_transfer/resnet50_KL_CV.csv"))
+write_csv(resnet50_surprisal_short_CV, here("data_to_transfer/resnet50_surprisal_short_CV.csv"))
+write_csv(resnet50_nonoise_CV, here("data_to_transfer/resnet50_nonoise_CV.csv"))
+write_csv(resnet50_nolearning_CV, here("data_to_transfer/resnet50_nolearning_CV.csv"))
+write_csv(linmodel_df, here("data_to_transfer/linmodel_df.csv"))
+
 # simulation df's
 aligned_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_aligned_eig.csv')) 
 resnet50_data = read_csv(here('simulations/sim_infant_exposure_duration/01_linked_sim/linked_resnet50_eig.csv')) 

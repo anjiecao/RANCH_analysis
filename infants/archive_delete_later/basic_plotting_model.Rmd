@@ -3,18 +3,18 @@ library(tidyverse)
 library(here)
 
 # Load model results
-model_results_path = "sim_res/cluster_results/exposure_duration/infants"
+model_results_path = "archive/sim_res/cluster_results/exposure_duration/infants"
 
 
 EIG_unscaled = read_csv(here(model_results_path, "resnet50/summarized_output_EIG_unscaled.csv"))
 EIG_scaled = read_csv(here(model_results_path, "resnet50/summarized_output_EIG.csv"))
-EIG_param_info = read_csv(here(model_results_path, "sim_info/param_info/eig.csv"))
+EIG_param_info = read_csv(here(model_results_path, "sim_info/param_info/param_info_eig.csv"))
 
 KL_unscaled = read_csv(here(model_results_path, "aligned/summarized_output_KL_unscaled.csv"))
 KL_scaled = read_csv(here(model_results_path, "aligned/summarized_output_KL.csv"))
-KL_param_info = read_csv(here(model_results_path, "sim_info/param_info/KL.csv"))
+KL_param_info = read_csv(here(model_results_path, "sim_info/param_info/param_info_KL.csv"))
 
-trial_info = read_csv(here(model_results_path, "sim_info/trial_info/trial_info_exposure_duration.csv"))
+trial_info = read_csv(here(model_results_path, "sim_info/trial_info/trial_info.csv"))
 
 
 
@@ -38,7 +38,10 @@ eig_unscaled = trial_info %>%
   right_join(EIG_param_info, by = c('param_id')) 
 
 eig_unscaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
- stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG unscaled')
+ stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG unscaled') 
+
+write_csv(eig_unscaled, 'resnet50_unscaled.csv')
+
 
 
 # scaled
@@ -50,6 +53,8 @@ eig_scaled = trial_info %>%
 
 eig_scaled %>% ggplot(aes(x = fam_duration, y = sample_n_mean, color = violation_type)) +
  stat_summary(fun.data = "mean_cl_boot") + ggtitle('EIG scaled')
+
+
 
   ## KL
 

@@ -16,12 +16,6 @@ options(dplyr.summarise.inform=F)
 
 ```
 
-helper function
-
-```{r}
-
-
-```
 
 # Load data and model sims
 ```{r}
@@ -46,6 +40,24 @@ surprisal_data_short = surprisal_data_short %>% filter(!(trial_number == 1 & tri
 surprisal_data_long = surprisal_data_long %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 nonoise_data = nonoise_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
 nolearning_data = nolearning_data %>% filter(!(trial_number == 1 & trial_type == 'deviant')) %>% renaming()
+
+```
+# Full dataset fits
+```{r}
+
+fulldata_aligned_EIG = run_all_full_data_fit(aligned_data, infant_data, "infants")
+fulldata_resnet50_EIG = run_all_full_data_fit(resnet50_data, infant_data, "infants")
+fulldata_resnet50_KL = run_all_full_data_fit(KL_data, infant_data, "infants")
+fulldata_resnet50_surprisal = run_all_full_data_fit(surprisal_data_long, infant_data, "infants")
+fulldata_aligned_nonoise = run_all_full_data_fit(nonoise_data, infant_data, "infants")
+fulldata_aligned_nolearning = run_all_full_data_fit(nolearning_data, infant_data, "infants")
+
+write_csv(fulldata_aligned_EIG, here("cached_data/infants_fulldata_aligned_EIG.csv"))
+write_csv(fulldata_resnet50_EIG, here("cached_data/infants_fulldata_resnet50_EIG.csv"))
+write_csv(fulldata_resnet50_KL, here("cached_data/infants_fulldata_resnet50_KL.csv"))
+write_csv(fulldata_resnet50_surprisal, here("cached_data/infants_fulldata_resnet50_surprisal.csv"))
+write_csv(fulldata_aligned_nonoise, here("cached_data/infants_fulldata_resnet50_nonoise.csv"))
+write_csv(fulldata_aligned_nolearning, here("cached_data/infants_fulldata_resnet50_nolearning.csv"))
 
 ```
 

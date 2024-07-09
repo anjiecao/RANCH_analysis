@@ -9,7 +9,7 @@ library(ggthemes)
 # Load data
 ```{r}
 
-infant_sims = read_csv(here('simulations/sim_infant_stimulus_type/generalization_infants.csv')) 
+infant_sims = read_csv(here('simulations/sim_infant_stimulus_type/01_linked_sim/linked_generalization.csv')) 
 adult_sims = read_csv(here('simulations/sim_infant_stimulus_type/generalization_adults.csv')) 
 
 trial_info = read_csv()
